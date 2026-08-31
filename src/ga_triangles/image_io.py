@@ -5,9 +5,12 @@ External image libraries (Pillow, numpy) ARE allowed for this module --
 the TP only forbids external libs for the GA itself.
 """
 
+# Marek
+
 from __future__ import annotations
 
 import numpy as np
+import PIL.Image as Image
 
 
 def load_target_image(path: str, size: tuple[int, int] | None = None) -> np.ndarray:
@@ -18,22 +21,33 @@ def load_target_image(path: str, size: tuple[int, int] | None = None) -> np.ndar
         size: optional (width, height) to resize to. If None, keep original.
 
     Returns:
-        np.ndarray of shape (H, W, 3) or (H, W, 4), dtype uint8.
+        np.ndarray of shape (H, W, 3) dtype uint8.
     """
-    # TODO: open with Pillow, convert to RGB or RGBA, resize if requested,
-    # return as a numpy array.
-    raise NotImplementedError
+
+    image = Image.open(path).convert("RGB")
+
+    if size is not None:
+        image = image.resize(size, resample=Image.Resampling.LANCZOS)
+
+    array = np.array(image)
+
+    #testing
+    print(array.shape)
+    print(array.dtype)
+
+    return array
 
 
 def save_image(array: np.ndarray, path: str) -> None:
     """Save an RGB(A) uint8 array to disk.
-
-    # TODO: convert array back to a Pillow Image and write to `path`.
     """
-    raise NotImplementedError
+    if array.dtype != np.uint8:
+        raise TypeError("array must be uint8")
+    image = Image.fromarray(array)
+    image.save(path)
 
 
-def blank_canvas(width: int, height: int, background: tuple[int, int, int] = (255, 255, 255)) -> np.ndarray:
+def blank_canvas(width: int = 720, height: int = 720, background: tuple[int, int, int] = (255, 255, 255)) -> np.ndarray:
     """Create a blank RGB canvas of the given size filled with `background`.
 
     # TODO: allocate a (height, width, 3) uint8 array filled with `background`.
