@@ -25,20 +25,35 @@ def render(individual: Individual, width: int, height: int,
         np.ndarray of shape (height, width, 3), dtype uint8.
     """
     pygame.init()
-    pygame.display.set_caption("Rendering Individual")
-    screen = pygame.display.set_mode((width, height)); screen.fill(background)
-    transparent_layer = pygame.Surface((width, height), pygame.SRCALPHA); transparent_layer.fill((0, 0, 0, 0))
+    canvas = pygame.Surface((width, height))
+    canvas.fill(background)
     
     for triangle in individual.triangles:
-        pygame.draw.polygon(transparent_layer, triangle.color, triangle.vertices)
-    
-    while True: 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT: 
-                pygame.quit()
-                return
+        pixel_colors = tuple(round(channel * 255) for channel in triangle.color)
+        pixel_vertices = [(round(x*(width-1)), round(y*(height-1))) for x, y in triangle.vertices]
+        layer = pygame.Surface((width, height), pygame.SRCALPHA)
+        layer.fill((0, 0, 0, 0))
+        pygame.draw.polygon(layer, pixel_colors, pixel_vertices)
+        canvas.blit(layer, (0,0))
+        
+    image = np.array(pygame.surfarray.array3d(canvas)).transpose(1, 0, 2)
+    pygame.quit()
+    return image
 
-"""
+def display_image(image: np.ndarray) -> None:
+    """Display an RGB image in a window until the user closes it."""
+    pygame.init()
+    pygame.display.set_caption("Rendered Image")
+    height, width, _ = image.shape
+    screen = pygame.display.set_mode((width, height))
+    pygame.surfarray.blit_array(screen, image.transpose(1,0,2))
+    pygame.display.flip()
+    while True: 
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    return
+    """
     # TODO:
     # 1. start from a blank canvas (see image_io.blank_canvas)
     # 2. for each triangle: rasterize it (e.g. matplotlib.path / PIL.ImageDraw
