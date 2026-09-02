@@ -24,7 +24,6 @@ def render(individual: Individual, width: int, height: int,
     Returns:
         np.ndarray of shape (height, width, 3), dtype uint8.
     """
-    pygame.init()
     canvas = pygame.Surface((width, height))
     canvas.fill(background)
     
@@ -37,7 +36,6 @@ def render(individual: Individual, width: int, height: int,
         canvas.blit(layer, (0,0))
         
     image = np.array(pygame.surfarray.array3d(canvas)).transpose(1, 0, 2)
-    pygame.quit()
     return image
 
 def display_image(image: np.ndarray) -> None:
