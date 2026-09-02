@@ -16,11 +16,17 @@ from ga_triangles.individual import Individual
 
 def pixel_error(rendered: np.ndarray, target: np.ndarray) -> float:
     """Distance between a rendered canvas and the target image.
-
-    # TODO: pick and justify a metric (e.g. mean squared error per pixel
-    # per channel, mean absolute error, 1 - SSIM, ...). Lower = closer.
+    Mean squared error per channel on intensities scaled to [0, 1]. 0 = identical, 1 = every channel maximally wrong. Lower = closer.
     """
-    raise NotImplementedError
+    assert rendered.dtype == np.uint8
+    assert rendered.shape == target.shape
+
+    rendered = rendered / 255.0
+    target = target / 255.0
+    diff = rendered - target
+    mse = np.mean(np.square(diff))
+
+    return float(mse)
 
 
 def fitness(individual: Individual, target: np.ndarray) -> float:
