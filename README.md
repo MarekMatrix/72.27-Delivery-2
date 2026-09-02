@@ -72,7 +72,7 @@ corresponding section of the report justifying the design decisions.
 
 | Area | Files | Involves |
 |---|---|---|
-| **1. Image I/O & rendering** | `image_io.py`, `render.py` | Load/resize target image; rasterize a list of translucent triangles onto a canvas with alpha blending. Pillow/numpy allowed here. |
+| **1. Image I/O & rendering** | `image_io.py`, `render.py` | Load/resize target image (Done, Marek); rasterize a list of translucent triangles onto a canvas with alpha blending. Pillow/numpy allowed here. |
 | **2. Representation & fitness** | `individual.py`, `fitness.py` | Decide the genome encoding (flat array vs. object list) — this choice affects everyone else. Define the error metric and fitness function; **write down the justification**, the TP asks for it explicitly. |
 | **3. Selection** | `selection.py` | All 7 required methods: Elite, Ruleta, Universal, Boltzmann, Torneo (deterministic + probabilistic), Ranking. |
 | **4. Crossover** | `crossover.py` | At least 2 of the 4 methods (one-point, two-point, uniform, ring). Decide (and justify) when each is appropriate. |
