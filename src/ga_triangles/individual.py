@@ -16,8 +16,6 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from tests.test_individual import test_random_individual_has_requested_triangle_count
-
 
 @dataclass(frozen=True)
 class Triangle:
