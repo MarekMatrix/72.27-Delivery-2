@@ -15,15 +15,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True)
 class Triangle:
-    """A single translucent triangle: 3 vertices + an RGBA color."""
-
-    # TODO: define fields, e.g.
-    # x: tuple[float, float, float]
-    # y: tuple[float, float, float]
-    # color: tuple[int, int, int, int]  # RGBA
-    pass
+    """each gene => a translucent triangle.
+    vertices: 3 (x, y) pairs, each coordinate normalised to [0, 1] to fit any canvas
+              (0,0) = top-left of canvas, (1,1) = bottom-right.
+    color:    (r, g, b, a), each channel normalised to a float between [0, 1].
+    """
+    vertices: tuple[tuple[float, float], tuple[float, float], tuple[float, float]]
+    color: tuple[float, float, float, float]
 
 
 @dataclass
