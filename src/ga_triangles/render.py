@@ -13,7 +13,7 @@ from ga_triangles.individual import Individual
 import pygame
 
 #Triangle = dict(vertices=[(x0, y0), (x1, y1), (x2, y2)],color=(r,g,b,a))
-
+#Could probably print best individual from all generations to see how it looks like.
 def render(individual: Individual, width: int, height: int,
            background: tuple[int, int, int] = (255, 255, 255)) -> np.ndarray:
     """Draw all triangles of `individual`, in order, onto a blank canvas.
