@@ -13,6 +13,8 @@ import numpy as np
 
 from ga_triangles.individual import Individual
 
+from ga_triangles.render import render
+
 
 def pixel_error(rendered: np.ndarray, target: np.ndarray) -> float:
     """Distance between a rendered canvas and the target image.
@@ -29,11 +31,17 @@ def pixel_error(rendered: np.ndarray, target: np.ndarray) -> float:
     return float(mse)
 
 
-def fitness(individual: Individual, target: np.ndarray) -> float:
+def fitness(individual: Individual, target: np.ndarray, k: float = 1.0) -> float:
     """Fitness of `individual` against `target`. Higher = better.
-
-    # TODO: render the individual (see render.render) and turn its error
-    # against `target` into a fitness score, e.g. fitness = 1 / (1 + error)
-    # or fitness = max_error - error. Cache the result on individual.fitness.
+    maps error → 1/(1+k·error) (always in (0, 1]).
+    Caches the result on individual.fitness
+    assumes callers set individual.fitness = None after any mutation/crossover.
     """
-    raise NotImplementedError
+    if individual.fitness is not None:
+        return individual.fitness
+    height, width = target.shape[:2]
+    error = pixel_error(render(individual, width, height), target)
+    score = 1/(1+k*error)
+    individual.fitness = score
+    return individual.fitness
+
