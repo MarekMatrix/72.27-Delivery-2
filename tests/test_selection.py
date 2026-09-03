@@ -30,6 +30,13 @@ def test_each_selection_method_returns_requested_count():
         print(individual.fitness)
         print("\n")
     print("\n*****************************\n")
+    result = selection.select_boltzmann(population, 6, 0.4)
+    print("\n*****************************\n")
+    print("Boltzmann selection result:")
+    for individual in result:
+        print(individual.fitness)
+        print("\n")
+    print("\n*****************************\n")
 
 def test_roulette_selection_biased_toward_higher_fitness():
     result = selection.select_roulette(population, 6)

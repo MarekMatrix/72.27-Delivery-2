@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from ga_triangles.individual import Individual
 import math
+import numpy as np
 import random
 from itertools import accumulate
 
@@ -82,8 +83,11 @@ def select_ranking(population: list[Individual], K: int) -> list[Individual]:
 def select_boltzmann(population: list[Individual], K: int, temperature: float) -> list[Individual]:
     """Boltzmann selection: fitness-proportionate over a temperature-scaled
     softmax, so selection pressure changes with `temperature`."""
-    # TODO
-    raise NotImplementedError
+    N = len(population)
+    promedio = sum(np.exp(individual.fitness/temperature) for individual in population) / N
+    boltzmann_fitness = [np.exp(individual.fitness/temperature)/promedio for individual in population]
+    selected = select_roulette(population, K, boltzmann_fitness)
+    return selected
 
 
 def select_tournament_deterministic(population: list[Individual], K: int, tournament_size: int) -> list[Individual]:
