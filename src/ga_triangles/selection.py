@@ -32,9 +32,9 @@ def select_elite(population: list[Individual], K: int) -> list[Individual]:
     return selected
 
 
-def select_roulette(population: list[Individual], K: int, fitness=[]) -> list[Individual]:
+def select_roulette(population: list[Individual], K: int, fitness=None) -> list[Individual]:
     """Fitness-proportionate selection (a.k.a. roulette wheel)."""
-    if fitness == []: 
+    if fitness == None: 
         fitness = [individual.fitness for individual in population]
     total_fitness = sum(fitness) 
     relative_fitness = [individual_fitness/total_fitness for individual_fitness in fitness]
@@ -83,6 +83,7 @@ def select_ranking(population: list[Individual], K: int) -> list[Individual]:
 def select_boltzmann(population: list[Individual], K: int, temperature: float) -> list[Individual]:
     """Boltzmann selection: fitness-proportionate over a temperature-scaled
     softmax, so selection pressure changes with `temperature`."""
+    temperature = max(temperature, 1e-6)  # avoid divide-by-zero
     N = len(population)
     promedio = sum(np.exp(individual.fitness/temperature) for individual in population) / N
     boltzmann_fitness = [np.exp(individual.fitness/temperature)/promedio for individual in population]
@@ -92,13 +93,26 @@ def select_boltzmann(population: list[Individual], K: int, temperature: float) -
 
 def select_tournament_deterministic(population: list[Individual], K: int, tournament_size: int) -> list[Individual]:
     """Deterministic tournament: best of `tournament_size` random individuals wins, always."""
-    # TODO
-    raise NotImplementedError
+    assert tournament_size <= len(population)
+    selected = []
+    for _ in range(K):
+        subpopulation = random.sample(population, tournament_size)
+        winner = subpopulation[max((i for i in range(tournament_size)), key=lambda i: subpopulation[i].fitness)]
+        selected.append(winner)
+    return selected
 
-
-def select_tournament_probabilistic(population: list[Individual], K: int, tournament_size: int, p: float) -> list[Individual]:
+def select_tournament_probabilistic(population: list[Individual], K: int, p: float) -> list[Individual]:
     """Probabilistic tournament: best of `tournament_size` wins with probability `p`,
     otherwise a random loser is chosen instead."""
-    # TODO
-    raise NotImplementedError
+    selected = []
+    for _ in range(K):
+        duel = random.sample(population, 2)
+        duel = sorted(duel, key=lambda individual: individual.fitness, reverse=True)
+        r = random.random()
+        if r > p:
+            winner = duel[0]
+        else:
+            winner = duel[1]
+        selected.append(winner)
+    return selected
 
