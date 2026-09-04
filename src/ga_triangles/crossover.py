@@ -14,9 +14,9 @@ from __future__ import annotations
 from ga_triangles.individual import Individual
 
 
-def crossover_one_point(parent_a: Individual, parent_b: Individual) -> tuple[Individual, Individual]:
+def crossover_one_point(parent_a: Individual, parent_b: Individual, rng: np.random.Generator) -> tuple[Individual, Individual]:
     """Single random cut point; swap the tail between both parents."""
-    # TODO
+    gut point
     raise NotImplementedError
 
 
