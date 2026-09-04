@@ -12,8 +12,7 @@ for i in range(10):
     Individual_i = Individual.random(5, random_seed)
     Individual_i.fitness = 1-0.1*i
     population.append(Individual_i)
-random.shuffle(population)
-
+random_seed.shuffle(population)
 
 def test_elite_selection_picks_best_individuals():
     result = selection.select_elite(population, 6)
@@ -23,7 +22,7 @@ def test_elite_selection_picks_best_individuals():
     #print("\n*****************************\n")
 
 def test_each_selection_method_returns_requested_count():
-    result = selection.select_ranking(population, 6)
+    result = selection.select_ranking(population, 6, random_seed)
     print("\n*****************************\n")
     print("Ranking selection result:")
     for individual in result:
@@ -31,7 +30,7 @@ def test_each_selection_method_returns_requested_count():
         print("\n")
     print("\n*****************************\n")
     
-    result = selection.select_boltzmann(population, 6, 0.4)
+    result = selection.select_boltzmann(population, 6, 0.4, random_seed)
     print("\n*****************************\n")
     print("Boltzmann selection result:")
     for individual in result:
@@ -39,7 +38,7 @@ def test_each_selection_method_returns_requested_count():
         print("\n")
     print("\n*****************************\n")
     
-    result = selection.select_tournament_deterministic(population, 6, 3)
+    result = selection.select_tournament_deterministic(population, 6, 3, random_seed)
     print("\n*****************************\n")
     print("Tournament deterministic selection result:")
     for individual in result:
@@ -47,7 +46,7 @@ def test_each_selection_method_returns_requested_count():
         print("\n")
     print("\n*****************************\n")
     
-    result = selection.select_tournament_probabilistic(population, 6, 0.5)
+    result = selection.select_tournament_probabilistic(population, 6, 0.5, random_seed)
     print("\n*****************************\n")
     print("Tournament probabilistic selection result:")
     for individual in result:
@@ -57,7 +56,7 @@ def test_each_selection_method_returns_requested_count():
 
 
 def test_roulette_selection_biased_toward_higher_fitness():
-    result = selection.select_roulette(population, 6)
+    result = selection.select_roulette(population, 6, random_seed)
     print("\n*****************************\n")
     print("Roulette selection result:")
     for individual in result:
@@ -66,7 +65,7 @@ def test_roulette_selection_biased_toward_higher_fitness():
     print("\n*****************************\n")
     
 def test_universal_selection_biased_toward_higher_fitness():
-    result = selection.select_universal(population, 6)
+    result = selection.select_universal(population, 6, random_seed)
     print("\n*****************************\n")
     print("Universal selection result:")
     for individual in result:
