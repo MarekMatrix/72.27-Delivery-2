@@ -20,8 +20,7 @@ def mutate_gene(individual: Individual, mutation_rate: float, rng: np.random.Gen
         individual.fitness = None
     return individual
 
-
-def mutate_multigene(individual: Individual, mutation_rate: float, rng: np.random.Generator) -> Individual:
+def mutate_multigene_limited(individual: Individual, mutation_rate: float, rng: np.random.Generator) -> Individual:
     """Each selected gene independently mutated with probability `mutation_rate`."""
     M = rng.integers(0, len(individual.triangles))
     indexes = rng.choice(range(len(individual.triangles)), size=M, replace=False)
@@ -33,7 +32,7 @@ def mutate_multigene(individual: Individual, mutation_rate: float, rng: np.rando
     return individual
 
 def mutate_uniform(individual: Individual, mutation_rate: float, rng: np.random.Generator) -> Individual:
-    """Replace a mutated gene's value with a fresh random value (uniform in its domain)."""
+    """Uniform mutation: each gene (triangle) is independently selected for mutation with probability mutation_rate."""
     for index in range(len(individual.triangles)): 
         r = rng.random()
         if r <= mutation_rate:
@@ -67,9 +66,14 @@ def mutate_triangle(triangle: Triangle, rng: np.random.Generator) -> Triangle:
     triangle = Triangle(tuple(tuple(vertex) for vertex in vertices), tuple(color))
     return triangle
 
+
+#def mutate_non_uniform(individual: Individual, mutation_rate: float, rng: np.random.Generator) -> Individual:
+#    return
+
+# Dont know what would be non uniform
 """
 mutate_gene: choose one triangle and slightly change one coordinate, color channel, or alpha.
-mutate_multigene: independently perturb several triangles.
+mutate_multigene_limited: independently perturb several triangles.
 mutate_uniform: mutates selected triangles.
 mutate_complete: mutates all triangles.
 """
