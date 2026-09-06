@@ -18,9 +18,6 @@ from ga_triangles.individual import Individual
 from ga_triangles.metrics import History
 from ga_triangles.render import render
 
-
-
-
 from ga_triangles.selection import (
     select_elite,
     select_roulette,
@@ -48,6 +45,13 @@ from ga_triangles.survival import (
     survival_additive,
     survival_exclusive,
 )
+
+from ga_triangles.crossover import (
+    crossover_one_point,
+    crossover_two_point,
+    crossover_uniform,
+)
+from ga_triangles.config import CrossoverMethod  
 
 @dataclass
 class GAResult:
@@ -250,9 +254,41 @@ def run_ga(target: np.ndarray, config: GAConfig) -> GAResult:
             config,
         )
 
-        # Crossover will be added here once the crossover branch
-        # is merged into develop.
+        # Crossover
+        offspring = []
+        for i in range(0, len(parents) - 1, 2):
+            a, b = parents[i], parents[i + 1]
+            if rng.random() < config.crossover_rate:
+                if config.crossover_method == CrossoverMethod.ONE_POINT:
+                    child_a, child_b = crossover_one_point(a, b, rng)
+                elif config.crossover_method == CrossoverMethod.TWO_POINT:
+                    child_a, child_b = crossover_two_point(a, b, rng)
+                elif config.crossover_method == CrossoverMethod.UNIFORM:
+                    child_a, child_b = crossover_uniform(a, b, rng)
+                else:
+                    raise ValueError(f"Unknown crossover method: {config.crossover_method}")
+            else:
+                child_a, child_b = a, b
+            offspring.extend([child_a, child_b])
 
-        raise NotImplementedError(
-            "Crossover integration is waiting for the crossover branch."
-        )
+    
+        # Mutasjon
+        offspring = [apply_mutation(ind, config, rng) for ind in offspring]
+
+        # Fitness
+        for ind in offspring:
+            fitness(ind, target)
+
+        # Survival
+        population = apply_survival(parents, offspring, config)
+
+        # Metrics
+        best_individual = record_population_metrics(population, target, history)
+        generation += 1
+
+    return GAResult(
+        best_individual=best_individual,
+        history=history,
+        n_generations_run=generation,
+        stop_reason=stop_reason,
+    )
