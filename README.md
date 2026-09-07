@@ -31,9 +31,33 @@ uv run ga-triangles --image data/flag.png --triangles 100 --generations 500 \
     --survival additive
 ```
 
-Run `uv run ga-triangles --help` for every flag (population size, rates, seed, etc).
+Run `uv run ga-triangles --help` to see this listing from the tool itself.
 Outputs land in `results/`: the approximated image, a fitness-over-generations
 plot, and a JSON dump of the run config + stop reason.
+
+### Flags
+
+| Flag | Type | Default | Meaning |
+|---|---|---|---|
+| `--image` | path | first image file found in `data/` | Target image to approximate. |
+| `--triangles` | int | *required* | Number of triangles per individual (genome size). |
+| `--output-dir` | path | `results` | Directory for the approximation image, fitness plot, and config/result JSON. |
+| `--population-size` | int | `100` | Number of individuals per generation. |
+| `--generations` | int | `500` | Number of generations to run. |
+| `--min-error` | float | none | Optional early-stop threshold on `pixel_error`; stops once reached, even if `--generations` hasn't. |
+| `--selection` | choice | `elite` | `elite`, `roulette`, `universal`, `boltzmann`, `tournament_deterministic`, `tournament_probabilistic`, `ranking`. |
+| `--crossover` | choice | `one_point` | `one_point`, `two_point`, `uniform`, `ring`. |
+| `--mutation` | choice | `gene` | `gene`, `multigene`, `uniform`, `non_uniform`. |
+| `--survival` | choice | `additive` | `additive` ((μ+λ): parents and offspring compete) or `exclusive` ((μ,λ): only offspring survive). |
+| `--crossover-rate` | float | `0.9` | Probability that a selected pair actually crosses over (vs. being copied through). |
+| `--mutation-rate` | float | `0.05` | Per-gene (or per-individual, depending on the method) mutation probability. |
+| `--seed` | int | none | Random seed, for reproducible runs. |
+
+Note: `GAConfig` (`src/ga_triangles/config.py`) also defines `tournament_size`,
+`tournament_probability`, and `boltzmann_temperature`, but `cli.py` doesn't
+currently expose them as flags — tournament and Boltzmann selection always run
+with their hardcoded defaults (size 3, probability 0.75, temperature 1.0)
+until someone adds the corresponding flags.
 
 ## Pipeline
 

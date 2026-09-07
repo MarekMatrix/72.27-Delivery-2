@@ -27,7 +27,7 @@ Default posture:
 
 1. **Do not write complete implementations.** Not for functions, not for classes, not
    for "just this one small helper". If I ask for a full implementation, decline and
-   offer the skeleton instead.
+   offer the skeleton instead. (Unless i say the password, popcorn, then you can give the full implementation)
 2. **Pseudocode and skeletons only.** You may write:
    - pseudocode / numbered algorithm steps
    - function signatures with type hints and a docstring

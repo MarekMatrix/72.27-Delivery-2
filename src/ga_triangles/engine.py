@@ -9,6 +9,7 @@ between everyone else's pieces, so it's easiest to finish last.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 import random
 
 import numpy as np
@@ -215,8 +216,16 @@ def record_population_metrics(
     return best_individual
 
 
-def run_ga(target: np.ndarray, config: GAConfig) -> GAResult:
-    """Run the full genetic algorithm and return the best individual found."""
+def run_ga(
+    target: np.ndarray,
+    config: GAConfig,
+    on_generation: Callable[[int, int, float], None] | None = None,
+) -> GAResult:
+    """Run the full genetic algorithm and return the best individual found.
+
+    on_generation, if given, is called as on_generation(generation, n_generations, best_fitness)
+    after each generation's metrics are recorded, including generation 0 (the initial population).
+    """
 
     rng = np.random.default_rng(config.random_seed)
 
@@ -238,6 +247,9 @@ def run_ga(target: np.ndarray, config: GAConfig) -> GAResult:
         target,
         history,
     )
+
+    if on_generation is not None:
+        on_generation(0, config.n_generations, best_individual.fitness)
 
     generation = 0
 
@@ -285,6 +297,9 @@ def run_ga(target: np.ndarray, config: GAConfig) -> GAResult:
         # Metrics
         best_individual = record_population_metrics(population, target, history)
         generation += 1
+
+        if on_generation is not None:
+            on_generation(generation, config.n_generations, best_individual.fitness)
 
     return GAResult(
         best_individual=best_individual,

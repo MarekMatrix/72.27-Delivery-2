@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
+from typing import Callable
 
 from ga_triangles.config import (
     CrossoverMethod,
@@ -26,7 +28,11 @@ from ga_triangles.render import render
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Approximate an image with GA-evolved triangles.")
-    parser.add_argument("--image", required=True, help="Path to the target image.")
+    parser.add_argument(
+        "--image",
+        default=None,
+        help="Path to the target image. Defaults to the first image file found in data/.",
+    )
     parser.add_argument("--triangles", type=int, required=True, help="Number of triangles to use.")
     parser.add_argument("--output-dir", default="results", help="Where to write outputs.")
 
@@ -45,12 +51,41 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp", ".gif")
+
+
+def default_image_path(data_dir: str | Path = "data") -> Path:
+    """Return the first image file found in data_dir, sorted by name."""
+    candidates = sorted(
+        p for p in Path(data_dir).iterdir() if p.suffix.lower() in IMAGE_EXTENSIONS
+    )
+    if not candidates:
+        raise FileNotFoundError(f"No image files found in '{data_dir}'.")
+    return candidates[0]
+
+
+def make_progress_printer(n_generations: int) -> Callable[[int, int, float], None]:
+    """Return a callback suitable for run_ga's on_generation, printing '\r' progress."""
+
+    def printer(generation: int, total_generations: int, best_fitness: float) -> None:
+        denom = max(total_generations, 1)
+        pct = min(generation / denom, 1.0) * 100
+        sys.stdout.write(
+            f"\rGen {generation}/{total_generations} ({pct:5.1f}%) best_fitness={best_fitness:.4f}"
+        )
+        sys.stdout.flush()
+
+    return printer
+
+
 def main(argv: list[str] | None = None) -> None:
     args = build_arg_parser().parse_args(argv)
 
+    image_path = args.image if args.image is not None else str(default_image_path())
+
     config = GAConfig(
         n_triangles=args.triangles,
-        target_image_path=args.image,
+        target_image_path=image_path,
         population_size=args.population_size,
         n_generations=args.generations,
         min_error=args.min_error,
@@ -63,8 +98,9 @@ def main(argv: list[str] | None = None) -> None:
         random_seed=args.seed,
     )
 
-    target = load_target_image(args.image)
-    result = run_ga(target, config)
+    target = load_target_image(image_path)
+    result = run_ga(target, config, on_generation=make_progress_printer(config.n_generations))
+    print()
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
