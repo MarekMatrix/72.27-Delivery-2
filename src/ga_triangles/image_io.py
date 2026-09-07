@@ -1,11 +1,4 @@
-"""Target image loading and canvas <-> array conversions.
-
-Owner: whoever picks up "image I/O & rendering".
-External image libraries (Pillow, numpy) ARE allowed for this module --
-the TP only forbids external libs for the GA itself.
-"""
-
-# Marek
+"""Target image loading and canvas <-> array conversions."""
 
 from __future__ import annotations
 

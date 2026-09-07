@@ -22,14 +22,13 @@ class CrossoverMethod(str, Enum):
     ONE_POINT = "one_point"
     TWO_POINT = "two_point"
     UNIFORM = "uniform"
-    RING = "ring"
 
 
 class MutationMethod(str, Enum):
     GENE = "gene"
     MULTIGENE = "multigene"
     UNIFORM = "uniform"
-    NON_UNIFORM = "non_uniform"
+    COMPLETE = "complete"
 
 
 class SurvivalStrategy(str, Enum):
@@ -39,7 +38,7 @@ class SurvivalStrategy(str, Enum):
 
 @dataclass
 class GAConfig:
-    # Problem parameters (not hyperparameters, see TP statement)
+    # Problem parameters (not hyperparameters)
     n_triangles: int = 50
     target_image_path: str = ""
 

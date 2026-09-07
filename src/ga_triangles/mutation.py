@@ -1,9 +1,7 @@
-"""Mutation operators. Implement at least 2 of the 4 (TP requirement).
+"""Mutation operators.
 
-Owner: whoever picks up "crossover & mutation".
-
-All operators mutate in place (or return a mutated copy -- pick one
-convention and use it consistently) with probability/rate `mutation_rate`.
+All operators mutate the supplied individual in place and return it.
+Callers must copy parents before passing them here as offspring.
 """
 
 from __future__ import annotations
@@ -65,15 +63,3 @@ def mutate_triangle(triangle: Triangle, rng: np.random.Generator) -> Triangle:
     
     triangle = Triangle(tuple(tuple(vertex) for vertex in vertices), tuple(color))
     return triangle
-
-
-#def mutate_non_uniform(individual: Individual, mutation_rate: float, rng: np.random.Generator) -> Individual:
-#    return
-
-# Dont know what would be non uniform
-"""
-mutate_gene: choose one triangle and slightly change one coordinate, color channel, or alpha.
-mutate_multigene_limited: independently perturb several triangles.
-mutate_uniform: mutates selected triangles.
-mutate_complete: mutates all triangles.
-"""

@@ -1,7 +1,6 @@
 """Main GA loop: orchestrates selection, crossover, mutation and survival.
 
-Owner: whoever picks up "engine & survival" -- this module is the glue
-between everyone else's pieces, so it's easiest to finish last.
+Owner: whoever picks up "engine & survival".
 """
 
 
@@ -39,6 +38,7 @@ from ga_triangles.mutation import (
     mutate_gene,
     mutate_multigene_limited,
     mutate_uniform,
+    mutate_complete,
 )
 
 from ga_triangles.survival import (
@@ -80,6 +80,7 @@ def select_parents(
     population: list[Individual],
     n_parents: int,
     config: GAConfig,
+    rng: np.random.Generator,
 ) -> list[Individual]:
     """Select parents using the selection method specified in the config."""
 
@@ -87,16 +88,17 @@ def select_parents(
         return select_elite(population, n_parents)
 
     if config.selection_method == SelectionMethod.ROULETTE:
-        return select_roulette(population, n_parents)
+        return select_roulette(population, n_parents, rng)
 
     if config.selection_method == SelectionMethod.UNIVERSAL:
-        return select_universal(population, n_parents)
+        return select_universal(population, n_parents, rng)
 
     if config.selection_method == SelectionMethod.BOLTZMANN:
         return select_boltzmann(
             population,
             n_parents,
             config.boltzmann_temperature,
+            rng,
         )
 
     if config.selection_method == SelectionMethod.TOURNAMENT_DETERMINISTIC:
@@ -104,6 +106,7 @@ def select_parents(
             population,
             n_parents,
             config.tournament_size,
+            rng,
         )
 
     if config.selection_method == SelectionMethod.TOURNAMENT_PROBABILISTIC:
@@ -111,10 +114,11 @@ def select_parents(
             population,
             n_parents,
             config.tournament_probability,
+            rng,
         )
 
     if config.selection_method == SelectionMethod.RANKING:
-        return select_ranking(population, n_parents)
+        return select_ranking(population, n_parents, rng)
 
     raise ValueError(f"Unknown selection method: {config.selection_method}")
 
@@ -147,9 +151,11 @@ def apply_mutation(
             rng,
         )
 
-    if config.mutation_method == MutationMethod.NON_UNIFORM:
-        raise NotImplementedError(
-            "Non-uniform mutation is not implemented."
+    if config.mutation_method == MutationMethod.COMPLETE:
+        return mutate_complete(
+            individual, 
+            config.mutation_rate, 
+            rng,
         )
 
     raise ValueError(
@@ -252,6 +258,7 @@ def run_ga(target: np.ndarray, config: GAConfig) -> GAResult:
             population,
             config.population_size,
             config,
+            rng,
         )
 
         # Crossover
@@ -268,7 +275,8 @@ def run_ga(target: np.ndarray, config: GAConfig) -> GAResult:
                 else:
                     raise ValueError(f"Unknown crossover method: {config.crossover_method}")
             else:
-                child_a, child_b = a, b
+                # Mutation edits individuals in place; keep parents unchanged.
+                child_a, child_b = a.copy(), b.copy()
             offspring.extend([child_a, child_b])
 
     
