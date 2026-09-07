@@ -23,15 +23,28 @@ def render(individual: Individual, width: int, height: int,
     """
     canvas = pygame.Surface((width, height))
     canvas.fill(background)
-    
+
     for triangle in individual.triangles:
         pixel_colors = tuple(round(channel * 255) for channel in triangle.color)
         pixel_vertices = [(round(x*(width-1)), round(y*(height-1))) for x, y in triangle.vertices]
-        layer = pygame.Surface((width, height), pygame.SRCALPHA)
+
+        xs = [x for x, _ in pixel_vertices]
+        ys = [y for _, y in pixel_vertices]
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+
+        # Only allocate/clear/blit the triangle's own bounding box instead of
+        # the whole canvas -- fill+blit cost scales with surface size, and for
+        # a canvas full of small triangles that dwarfs the actual polygon draw.
+        bbox_width = max_x - min_x + 1
+        bbox_height = max_y - min_y + 1
+
+        layer = pygame.Surface((bbox_width, bbox_height), pygame.SRCALPHA)
         layer.fill((0, 0, 0, 0))
-        pygame.draw.polygon(layer, pixel_colors, pixel_vertices)
-        canvas.blit(layer, (0,0))
-        
+        local_vertices = [(x - min_x, y - min_y) for x, y in pixel_vertices]
+        pygame.draw.polygon(layer, pixel_colors, local_vertices)
+        canvas.blit(layer, (min_x, min_y))
+
     image = np.array(pygame.surfarray.array3d(canvas)).transpose(1, 0, 2)
     return image
 
