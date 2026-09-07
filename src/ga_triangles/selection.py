@@ -15,7 +15,6 @@ from __future__ import annotations
 from ga_triangles.individual import Individual
 import math
 import numpy as np
-import random
 from itertools import accumulate
 
 
@@ -32,14 +31,14 @@ def select_elite(population: list[Individual], K: int) -> list[Individual]:
     return selected
 
 
-def select_roulette(population: list[Individual], K: int, fitness=None) -> list[Individual]:
+def select_roulette(population: list[Individual], K: int, rng: np.random.Generator, fitness=None) -> list[Individual]:
     """Fitness-proportionate selection (a.k.a. roulette wheel)."""
-    if fitness == None: 
+    if fitness is None: 
         fitness = [individual.fitness for individual in population]
     total_fitness = sum(fitness) 
     relative_fitness = [individual_fitness/total_fitness for individual_fitness in fitness]
     accumulated_fitness = list(accumulate(relative_fitness))
-    r = sorted([random.random() for _ in range(K)])
+    r = sorted([rng.random() for _ in range(K)])
     selected = []
     i, j = 0, 0
     while i < K:
@@ -50,12 +49,12 @@ def select_roulette(population: list[Individual], K: int, fitness=None) -> list[
     return selected
 
 
-def select_universal(population: list[Individual], K: int) -> list[Individual]:
+def select_universal(population: list[Individual], K: int, rng: np.random.Generator) -> list[Individual]:
     """Stochastic universal sampling: single random offset, evenly spaced picks."""
     total_fitness = sum(individual.fitness for individual in population) 
     relative_fitness = [individual.fitness/total_fitness for individual in population]
     accumulated_fitness = list(accumulate(relative_fitness))
-    offset = random.random()
+    offset = rng.random()
     r = [(offset + j) / K  for j in range(K)]
     selected = []
     i, j = 0, 0
@@ -67,7 +66,7 @@ def select_universal(population: list[Individual], K: int) -> list[Individual]:
     return selected
 
 
-def select_ranking(population: list[Individual], K: int) -> list[Individual]:
+def select_ranking(population: list[Individual], K: int, rng: np.random.Generator) -> list[Individual]:
     """Ranking selection: probability of selection depends on rank, not raw fitness
     (smooths out fitness-scale issues that hurt roulette)."""
     N = len(population)
@@ -76,40 +75,41 @@ def select_ranking(population: list[Individual], K: int) -> list[Individual]:
     for pos, idx in enumerate(sorted_indices):
         rank[idx] = pos
     rank_fitness = [(N - rank[i]) / N for i in range(N)]
-    selected = select_roulette(population, K, rank_fitness)
+    selected = select_roulette(population, K, rng, rank_fitness)
     return selected
 
 
-def select_boltzmann(population: list[Individual], K: int, temperature: float) -> list[Individual]:
+def select_boltzmann(population: list[Individual], K: int, temperature: float, rng: np.random.Generator) -> list[Individual]:
     """Boltzmann selection: fitness-proportionate over a temperature-scaled
     softmax, so selection pressure changes with `temperature`."""
     temperature = max(temperature, 1e-6)  # avoid divide-by-zero
     N = len(population)
     promedio = sum(np.exp(individual.fitness/temperature) for individual in population) / N
     boltzmann_fitness = [np.exp(individual.fitness/temperature)/promedio for individual in population]
-    selected = select_roulette(population, K, boltzmann_fitness)
+    selected = select_roulette(population, K, rng, boltzmann_fitness)
     return selected
 
 
-def select_tournament_deterministic(population: list[Individual], K: int, tournament_size: int) -> list[Individual]:
+def select_tournament_deterministic(population: list[Individual], K: int, tournament_size: int, rng: np.random.Generator) -> list[Individual]:
     """Deterministic tournament: best of `tournament_size` random individuals wins, always."""
     assert tournament_size <= len(population)
+    assert tournament_size >= 1
     selected = []
     for _ in range(K):
-        subpopulation = random.sample(population, tournament_size)
+        subpopulation = rng.choice(population, size=tournament_size, replace=False)
         winner = subpopulation[max((i for i in range(tournament_size)), key=lambda i: subpopulation[i].fitness)]
         selected.append(winner)
     return selected
 
-def select_tournament_probabilistic(population: list[Individual], K: int, p: float) -> list[Individual]:
+def select_tournament_probabilistic(population: list[Individual], K: int, p: float, rng: np.random.Generator) -> list[Individual]:
     """Probabilistic tournament: best of `tournament_size` wins with probability `p`,
     otherwise a random loser is chosen instead."""
     selected = []
     for _ in range(K):
-        duel = random.sample(population, 2)
+        duel = rng.choice(population, size=2, replace=False)
         duel = sorted(duel, key=lambda individual: individual.fitness, reverse=True)
-        r = random.random()
-        if r > p:
+        r = rng.random()
+        if r < p:
             winner = duel[0]
         else:
             winner = duel[1]

@@ -80,6 +80,7 @@ def select_parents(
     population: list[Individual],
     n_parents: int,
     config: GAConfig,
+    rng: np.random.Generator,
 ) -> list[Individual]:
     """Select parents using the selection method specified in the config."""
 
@@ -87,16 +88,17 @@ def select_parents(
         return select_elite(population, n_parents)
 
     if config.selection_method == SelectionMethod.ROULETTE:
-        return select_roulette(population, n_parents)
+        return select_roulette(population, n_parents, rng)
 
     if config.selection_method == SelectionMethod.UNIVERSAL:
-        return select_universal(population, n_parents)
+        return select_universal(population, n_parents, rng)
 
     if config.selection_method == SelectionMethod.BOLTZMANN:
         return select_boltzmann(
             population,
             n_parents,
             config.boltzmann_temperature,
+            rng,
         )
 
     if config.selection_method == SelectionMethod.TOURNAMENT_DETERMINISTIC:
@@ -104,6 +106,7 @@ def select_parents(
             population,
             n_parents,
             config.tournament_size,
+            rng,
         )
 
     if config.selection_method == SelectionMethod.TOURNAMENT_PROBABILISTIC:
@@ -111,10 +114,11 @@ def select_parents(
             population,
             n_parents,
             config.tournament_probability,
+            rng,
         )
 
     if config.selection_method == SelectionMethod.RANKING:
-        return select_ranking(population, n_parents)
+        return select_ranking(population, n_parents, rng)
 
     raise ValueError(f"Unknown selection method: {config.selection_method}")
 
@@ -252,6 +256,7 @@ def run_ga(target: np.ndarray, config: GAConfig) -> GAResult:
             population,
             config.population_size,
             config,
+            rng,
         )
 
         # Crossover
