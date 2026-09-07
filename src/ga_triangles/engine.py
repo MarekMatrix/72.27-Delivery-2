@@ -12,10 +12,9 @@ import random
 
 import numpy as np
 
-from ga_triangles.fitness import fitness, pixel_error
+from ga_triangles.fitness import fitness
 from ga_triangles.individual import Individual
 from ga_triangles.metrics import History
-from ga_triangles.render import render
 
 from ga_triangles.selection import (
     select_elite,
@@ -191,7 +190,6 @@ def apply_survival(
 
 def record_population_metrics(
     population: list[Individual],
-    target: np.ndarray,
     history: History,
 ) -> Individual:
     """Record best fitness, mean fitness and best error for the population."""
@@ -205,12 +203,10 @@ def record_population_metrics(
         np.mean([individual.fitness for individual in population])
     )
 
-    height, width = target.shape[:2]
-
-    best_error = pixel_error(
-        render(best_individual, width, height),
-        target,
-    )
+    # fitness() caches score = 1 / (1 + k*error) with k=1 (the default used
+    # everywhere in this file), so error is recovered exactly without
+    # re-rendering and re-diffing the best individual a second time.
+    best_error = 1.0 / best_individual.fitness - 1.0
 
     history.record(
         best_fitness=best_individual.fitness,
@@ -241,7 +237,6 @@ def run_ga(target: np.ndarray, config: GAConfig) -> GAResult:
 
     best_individual = record_population_metrics(
         population,
-        target,
         history,
     )
 
@@ -290,7 +285,7 @@ def run_ga(target: np.ndarray, config: GAConfig) -> GAResult:
         population = apply_survival(parents, offspring, config)
 
         # Metrics
-        best_individual = record_population_metrics(population, target, history)
+        best_individual = record_population_metrics(population, history)
         generation += 1
 
     return GAResult(
