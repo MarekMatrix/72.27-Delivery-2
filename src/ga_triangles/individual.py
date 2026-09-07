@@ -1,13 +1,6 @@
 """Genome / individual representation.
-
-Owner: whoever picks up "representation & fitness".
-
-Decide here:
-- What exactly is a gene? (one triangle's vertices+color? one coordinate?)
-- Is the genome a flat array (easier for generic crossover/mutation) or a
-  list of Triangle objects (easier to read, harder to slice generically)?
-This decision ripples into selection.py, crossover.py and mutation.py, so
-pin it down early and document it for the rest of the group.
+An individual is a set of triangles and represents a solution to the image representation.
+A gene is one triangle with its vertices and color.
 """
 
 from __future__ import annotations

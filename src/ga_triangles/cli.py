@@ -1,9 +1,7 @@
 """Command-line entry point: `ga-triangles --image ... --triangles ...`.
 
 Argument parsing is boilerplate and implemented in full here. It calls
-straight into engine.run_ga, so this file "just works" once the rest of
-the package is implemented -- no need to touch it while developing the
-individual modules.
+straight into engine.run_ga.
 """
 
 from __future__ import annotations

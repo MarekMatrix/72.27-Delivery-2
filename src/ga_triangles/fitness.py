@@ -1,11 +1,4 @@
-"""Fitness / error function.
-
-Owner: whoever picks up "representation & fitness".
-
-This is one of the questions the TP explicitly asks you to answer before
-experimenting -- write the justification in docs/report, don't just pick
-a metric silently.
-"""
+"""Fitness / error function."""
 
 from __future__ import annotations
 

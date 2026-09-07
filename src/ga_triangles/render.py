@@ -1,6 +1,5 @@
 """Rasterize an Individual (list of translucent triangles) onto a canvas.
 
-Owner: whoever picks up "image I/O & rendering".
 This is the bridge between the genome (individual.py) and pixel space
 (image_io.py) that fitness.py needs to compare against the target.
 """
@@ -12,8 +11,6 @@ import numpy as np
 from ga_triangles.individual import Individual
 import pygame
 
-#Triangle = dict(vertices=[(x0, y0), (x1, y1), (x2, y2)],color=(r,g,b,a))
-#Could probably print best individual from all generations to see how it looks like.
 def render(individual: Individual, width: int, height: int,
            background: tuple[int, int, int] = (255, 255, 255)) -> np.ndarray:
     """Draw all triangles of `individual`, in order, onto a blank canvas.
@@ -64,12 +61,3 @@ def display_image(image: np.ndarray) -> None:
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     return
-    """
-    # TODO:
-    # 1. start from a blank canvas (see image_io.blank_canvas)
-    # 2. for each triangle: rasterize it (e.g. matplotlib.path / PIL.ImageDraw
-    #    / your own scanline fill) and alpha-composite its RGBA color onto
-    #    the canvas region it covers
-    # 3. return the final RGB canvas
-    raise NotImplementedError
-"""
