@@ -275,7 +275,8 @@ def run_ga(target: np.ndarray, config: GAConfig) -> GAResult:
                 else:
                     raise ValueError(f"Unknown crossover method: {config.crossover_method}")
             else:
-                child_a, child_b = a, b
+                # Mutation edits individuals in place; keep parents unchanged.
+                child_a, child_b = a.copy(), b.copy()
             offspring.extend([child_a, child_b])
 
     

@@ -1,6 +1,7 @@
 """Mutation operators.
 
-All operators return a mutated copy with probability/rate `mutation_rate`.
+All operators mutate the supplied individual in place and return it.
+Callers must copy parents before passing them here as offspring.
 """
 
 from __future__ import annotations
