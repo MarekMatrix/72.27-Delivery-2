@@ -13,12 +13,18 @@ import numpy as np
 import PIL.Image as Image
 
 
-def load_target_image(path: str, size: tuple[int, int] | None = None) -> np.ndarray:
+def load_target_image(
+    path: str,
+    size: tuple[int, int] | None = None,
+    max_size: int | None = None,
+) -> np.ndarray:
     """Load an image from disk as an RGB(A) array, optionally resized.
 
     Args:
         path: filesystem path to the source image.
-        size: optional (width, height) to resize to. If None, keep original.
+        size: optional exact (width, height) to resize to. If None, keep original.
+        max_size: optional cap on the longer side, preserving aspect ratio.
+            Ignored if `size` is given. Only ever downscales, never upscales.
 
     Returns:
         np.ndarray of shape (H, W, 3) dtype uint8.
@@ -28,12 +34,13 @@ def load_target_image(path: str, size: tuple[int, int] | None = None) -> np.ndar
 
     if size is not None:
         image = image.resize(size, resample=Image.Resampling.LANCZOS)
+    elif max_size is not None:
+        scale = max_size / max(image.width, image.height)
+        if scale < 1:
+            new_size = (round(image.width * scale), round(image.height * scale))
+            image = image.resize(new_size, resample=Image.Resampling.LANCZOS)
 
     array = np.array(image)
-
-    #testing
-    print(array.shape)
-    print(array.dtype)
 
     return array
 

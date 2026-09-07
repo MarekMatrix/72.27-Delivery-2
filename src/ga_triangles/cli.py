@@ -35,6 +35,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--triangles", type=int, required=True, help="Number of triangles to use.")
     parser.add_argument("--output-dir", default="results", help="Where to write outputs.")
+    parser.add_argument(
+        "--max-image-size",
+        type=int,
+        default=None,
+        help="Downscale the target image so its longer side is at most this many pixels "
+             "(aspect ratio preserved, never upscales). Speeds up rendering/fitness a lot.",
+    )
+    parser.add_argument(
+        "--triangle-max-offset",
+        type=float,
+        default=None,
+        help="If set, initial triangles are built from one random anchor point plus the "
+             "other two vertices offset by at most this much (in [0,1] canvas units), "
+             "biasing the initial population toward smaller triangles. Default: fully "
+             "independent random vertices (can be large).",
+    )
 
     parser.add_argument("--population-size", type=int, default=100)
     parser.add_argument("--generations", type=int, default=500)
@@ -89,6 +105,7 @@ def write_run_summary(path: Path, config: GAConfig, image_path: str, result_summ
         "|---|---|",
         f"| image | `{image_path}` |",
         f"| triangles | {config.n_triangles} |",
+        f"| initial_triangle_max_offset | {config.initial_triangle_max_offset} |",
         f"| population_size | {config.population_size} |",
         f"| generations (max) | {config.n_generations} |",
         f"| min_error | {config.min_error} |",
@@ -120,6 +137,7 @@ def main(argv: list[str] | None = None) -> None:
     config = GAConfig(
         n_triangles=args.triangles,
         target_image_path=image_path,
+        initial_triangle_max_offset=args.triangle_max_offset,
         population_size=args.population_size,
         n_generations=args.generations,
         min_error=args.min_error,
@@ -132,7 +150,7 @@ def main(argv: list[str] | None = None) -> None:
         random_seed=args.seed,
     )
 
-    target = load_target_image(image_path)
+    target = load_target_image(image_path, max_size=args.max_image_size)
     result = run_ga(target, config, on_generation=make_progress_printer(config.n_generations))
     print()
 

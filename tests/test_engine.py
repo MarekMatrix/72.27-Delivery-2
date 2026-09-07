@@ -55,12 +55,10 @@ def test_record_population_metrics_adds_history_entry():
     population[0].fitness = 0.8
     population[1].fitness = 0.6
 
-    target = np.zeros((10, 10, 3), dtype=np.uint8)
     history = History()
 
     best = record_population_metrics(
         population,
-        target,
         history,
     )
 
