@@ -41,6 +41,7 @@ class GAConfig:
     # Problem parameters (not hyperparameters)
     n_triangles: int = 50
     target_image_path: str = ""
+    initial_triangle_max_offset: float | None = None  # None = fully random triangles
 
     # Population / evolution hyperparameters
     population_size: int = 100
