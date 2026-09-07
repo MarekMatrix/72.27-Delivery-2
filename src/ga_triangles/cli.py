@@ -78,6 +78,40 @@ def make_progress_printer(n_generations: int) -> Callable[[int, int, float], Non
     return printer
 
 
+def write_run_summary(path: Path, config: GAConfig, image_path: str, result_summary: dict) -> None:
+    """Write a short Markdown summary of the run's settings and outcome."""
+    lines = [
+        f"# Run: {path.parent.name}",
+        "",
+        "## Settings",
+        "",
+        "| Parameter | Value |",
+        "|---|---|",
+        f"| image | `{image_path}` |",
+        f"| triangles | {config.n_triangles} |",
+        f"| population_size | {config.population_size} |",
+        f"| generations (max) | {config.n_generations} |",
+        f"| min_error | {config.min_error} |",
+        f"| selection | {config.selection_method.value} |",
+        f"| crossover | {config.crossover_method.value} |",
+        f"| crossover_rate | {config.crossover_rate} |",
+        f"| mutation | {config.mutation_method.value} |",
+        f"| mutation_rate | {config.mutation_rate} |",
+        f"| survival | {config.survival_strategy.value} |",
+        f"| seed | {config.random_seed} |",
+        "",
+        "## Result",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
+        f"| generations run | {result_summary['n_generations_run']} |",
+        f"| stop reason | {result_summary['stop_reason']} |",
+        f"| best fitness | {result_summary['best_fitness']:.6f} |",
+        "",
+    ]
+    path.write_text("\n".join(lines))
+
+
 def main(argv: list[str] | None = None) -> None:
     args = build_arg_parser().parse_args(argv)
 
@@ -110,6 +144,17 @@ def main(argv: list[str] | None = None) -> None:
 
     with open(output_dir / "triangles.json", "w") as f:
         json.dump({"config": config.__dict__, "stop_reason": result.stop_reason}, f, indent=2, default=str)
+
+    write_run_summary(
+        output_dir / "run_summary.md",
+        config,
+        image_path,
+        {
+            "n_generations_run": result.n_generations_run,
+            "stop_reason": result.stop_reason,
+            "best_fitness": result.best_individual.fitness,
+        },
+    )
 
 
 if __name__ == "__main__":

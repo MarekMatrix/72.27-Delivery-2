@@ -254,52 +254,55 @@ def run_ga(
     generation = 0
 
     while True:
-        stop_reason = should_stop(generation, config, history)
+        try:
+            stop_reason = should_stop(generation, config, history)
 
-        if stop_reason is not None:
-            break
+            if stop_reason is not None:
+                break
 
-        # Selection
-        parents = select_parents(
-            population,
-            config.population_size,
-            config,
-        )
+            # Selection
+            parents = select_parents(
+                population,
+                config.population_size,
+                config,
+            )
 
-        # Crossover
-        offspring = []
-        for i in range(0, len(parents) - 1, 2):
-            a, b = parents[i], parents[i + 1]
-            if rng.random() < config.crossover_rate:
-                if config.crossover_method == CrossoverMethod.ONE_POINT:
-                    child_a, child_b = crossover_one_point(a, b, rng)
-                elif config.crossover_method == CrossoverMethod.TWO_POINT:
-                    child_a, child_b = crossover_two_point(a, b, rng)
-                elif config.crossover_method == CrossoverMethod.UNIFORM:
-                    child_a, child_b = crossover_uniform(a, b, rng)
+            # Crossover
+            offspring = []
+            for i in range(0, len(parents) - 1, 2):
+                a, b = parents[i], parents[i + 1]
+                if rng.random() < config.crossover_rate:
+                    if config.crossover_method == CrossoverMethod.ONE_POINT:
+                        child_a, child_b = crossover_one_point(a, b, rng)
+                    elif config.crossover_method == CrossoverMethod.TWO_POINT:
+                        child_a, child_b = crossover_two_point(a, b, rng)
+                    elif config.crossover_method == CrossoverMethod.UNIFORM:
+                        child_a, child_b = crossover_uniform(a, b, rng)
+                    else:
+                        raise ValueError(f"Unknown crossover method: {config.crossover_method}")
                 else:
-                    raise ValueError(f"Unknown crossover method: {config.crossover_method}")
-            else:
-                child_a, child_b = a, b
-            offspring.extend([child_a, child_b])
+                    child_a, child_b = a, b
+                offspring.extend([child_a, child_b])
 
-    
-        # Mutasjon
-        offspring = [apply_mutation(ind, config, rng) for ind in offspring]
+            # Mutasjon
+            offspring = [apply_mutation(ind, config, rng) for ind in offspring]
 
-        # Fitness
-        for ind in offspring:
-            fitness(ind, target)
+            # Fitness
+            for ind in offspring:
+                fitness(ind, target)
 
-        # Survival
-        population = apply_survival(parents, offspring, config)
+            # Survival
+            population = apply_survival(parents, offspring, config)
 
-        # Metrics
-        best_individual = record_population_metrics(population, target, history)
-        generation += 1
+            # Metrics
+            best_individual = record_population_metrics(population, target, history)
+            generation += 1
 
-        if on_generation is not None:
-            on_generation(generation, config.n_generations, best_individual.fitness)
+            if on_generation is not None:
+                on_generation(generation, config.n_generations, best_individual.fitness)
+        except KeyboardInterrupt:
+            stop_reason = "interrupted by user (Ctrl+C)"
+            break
 
     return GAResult(
         best_individual=best_individual,
