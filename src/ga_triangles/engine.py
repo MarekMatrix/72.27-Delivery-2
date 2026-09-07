@@ -230,7 +230,7 @@ def run_ga(target: np.ndarray, config: GAConfig) -> GAResult:
         random.seed(config.random_seed)
 
     population = [
-        Individual.random(config.n_triangles, rng)
+        Individual.random(config.n_triangles, rng, max_offset=config.initial_triangle_max_offset)
         for _ in range(config.population_size)
     ]
 

@@ -27,6 +27,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--image", required=True, help="Path to the target image.")
     parser.add_argument("--triangles", type=int, required=True, help="Number of triangles to use.")
     parser.add_argument("--output-dir", default="results", help="Where to write outputs.")
+    parser.add_argument(
+        "--triangle-max-offset",
+        type=float,
+        default=None,
+        help="If set, initial triangles are built from one random anchor point plus the "
+             "other two vertices offset by at most this much (in [0,1] canvas units), "
+             "biasing the initial population toward smaller triangles. Default: fully "
+             "independent random vertices (can be large).",
+    )
 
     parser.add_argument("--population-size", type=int, default=100)
     parser.add_argument("--generations", type=int, default=500)
@@ -49,6 +58,7 @@ def main(argv: list[str] | None = None) -> None:
     config = GAConfig(
         n_triangles=args.triangles,
         target_image_path=args.image,
+        initial_triangle_max_offset=args.triangle_max_offset,
         population_size=args.population_size,
         n_generations=args.generations,
         min_error=args.min_error,
