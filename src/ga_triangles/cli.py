@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import time
 
 from ga_triangles.config import (
     CrossoverMethod,
@@ -45,10 +46,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> None:
-    args = build_arg_parser().parse_args(argv)
-
-    config = GAConfig(
+def config_from_args(args: argparse.Namespace) -> GAConfig:
+    """Share the exact effective configuration with the experiment runner."""
+    return GAConfig(
         n_triangles=args.triangles,
         target_image_path=args.image,
         population_size=args.population_size,
@@ -63,8 +63,14 @@ def main(argv: list[str] | None = None) -> None:
         random_seed=args.seed,
     )
 
+
+def main(argv: list[str] | None = None) -> None:
+    args = build_arg_parser().parse_args(argv)
+    config = config_from_args(args)
     target = load_target_image(args.image)
+    ga_start = time.perf_counter()
     result = run_ga(target, config)
+    ga_elapsed_s = time.perf_counter() - ga_start
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -75,6 +81,7 @@ def main(argv: list[str] | None = None) -> None:
     with open(output_dir / "triangles.json", "w") as f:
         json.dump({
             "config": config.__dict__,
+            "ga_elapsed_s": ga_elapsed_s,
             "stop_reason": result.stop_reason,
             "n_generations_run": result.n_generations_run,
             "final_fitness": result.best_individual.fitness,
