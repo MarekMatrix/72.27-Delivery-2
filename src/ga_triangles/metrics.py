@@ -1,9 +1,4 @@
-"""Per-generation metric tracking and plotting.
-
-Owner: whoever picks up "engine & survival" (tracking); plotting helpers
-are boilerplate under CLAUDE.md and implemented here in full -- extend
-them as needed, no need to ask.
-"""
+"""Per-generation metric tracking and plotting."""
 
 from __future__ import annotations
 

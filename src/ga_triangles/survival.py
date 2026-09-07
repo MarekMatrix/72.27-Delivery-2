@@ -1,7 +1,4 @@
-"""Survival strategies for forming the next generation (both required by the TP).
-
-Owner: whoever picks up "engine & survival".
-"""
+"""Survival strategies for forming the next generation."""
 
 from __future__ import annotations
 

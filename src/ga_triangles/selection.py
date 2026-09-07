@@ -1,13 +1,9 @@
-"""Parent/survivor selection methods, as seen in class.
-
-Owner: whoever picks up "selection".
+"""Parent/survivor selection methods.
 
 All functions share the same shape: given a population (already fitness-
 evaluated) and how many individuals to pick, return that many individuals
 (with replacement, as usual for parent selection).
 
-Keep every method's signature identical so engine.py can swap between them
-via config.SelectionMethod without special-casing.
 """
 
 from __future__ import annotations
