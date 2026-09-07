@@ -1,7 +1,6 @@
 """Main GA loop: orchestrates selection, crossover, mutation and survival.
 
-Owner: whoever picks up "engine & survival" -- this module is the glue
-between everyone else's pieces, so it's easiest to finish last.
+Owner: whoever picks up "engine & survival".
 """
 
 
@@ -39,6 +38,7 @@ from ga_triangles.mutation import (
     mutate_gene,
     mutate_multigene_limited,
     mutate_uniform,
+    mutate_complete,
 )
 
 from ga_triangles.survival import (
@@ -151,9 +151,11 @@ def apply_mutation(
             rng,
         )
 
-    if config.mutation_method == MutationMethod.NON_UNIFORM:
-        raise NotImplementedError(
-            "Non-uniform mutation is not implemented."
+    if config.mutation_method == MutationMethod.COMPLETE:
+        return mutate_complete(
+            individual, 
+            config.mutation_rate, 
+            rng,
         )
 
     raise ValueError(

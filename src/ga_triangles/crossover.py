@@ -1,12 +1,7 @@
-"""Crossover operators. Implement at least 2 of the 4 (TP requirement).
+"""Crossover operators.
 
-Owner: whoever picks up "crossover & mutation".
-
-Depends on how individual.py represents a genome: if it's a flat array,
-one/two-point and uniform crossover are direct index slicing/masking. If
-it's a list of Triangle objects, treat each triangle as one "gene" for
-these operators (crossing over whole triangles, not their sub-fields) --
-document whichever choice you make.
+Each triangle is treated as one "gene" for
+these operators (crossing over whole triangles, not their sub-fields).
 """
 
 from __future__ import annotations
@@ -67,13 +62,3 @@ def crossover_uniform(parent_a: Individual, parent_b: Individual, rng: np.random
 
     return individual1, individual2
 
-
-
-    raise NotImplementedError
-
-
-# def crossover_ring(parent_a: Individual, parent_b: Individual) -> tuple[Individual, Individual]:
-#     """Anular/ring crossover: genomes joined into a ring, cut at two random
-#     points, offspring built by walking the ring in opposite directions."""
-#     # TODO: delete this, we have 3/4
-#     raise NotImplementedError
