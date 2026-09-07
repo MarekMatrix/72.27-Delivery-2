@@ -27,6 +27,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--image", required=True, help="Path to the target image.")
     parser.add_argument("--triangles", type=int, required=True, help="Number of triangles to use.")
     parser.add_argument("--output-dir", default="results", help="Where to write outputs.")
+    parser.add_argument(
+        "--max-image-size",
+        type=int,
+        default=None,
+        help="Downscale the target image so its longer side is at most this many pixels "
+             "(aspect ratio preserved, never upscales). Speeds up rendering/fitness a lot.",
+    )
 
     parser.add_argument("--population-size", type=int, default=100)
     parser.add_argument("--generations", type=int, default=500)
@@ -61,7 +68,7 @@ def main(argv: list[str] | None = None) -> None:
         random_seed=args.seed,
     )
 
-    target = load_target_image(args.image)
+    target = load_target_image(args.image, max_size=args.max_image_size)
     result = run_ga(target, config)
 
     output_dir = Path(args.output_dir)
