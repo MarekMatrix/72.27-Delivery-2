@@ -73,7 +73,15 @@ def main(argv: list[str] | None = None) -> None:
     result.history.plot(str(output_dir / "fitness.png"))
 
     with open(output_dir / "triangles.json", "w") as f:
-        json.dump({"config": config.__dict__, "stop_reason": result.stop_reason}, f, indent=2, default=str)
+        json.dump({
+            "config": config.__dict__,
+            "stop_reason": result.stop_reason,
+            "n_generations_run": result.n_generations_run,
+            "final_fitness": result.best_individual.fitness,
+            "final_error": float(result.history.best_error[-1]),
+            "fitness_history": result.history.best_fitness,
+            "error_history": result.history.best_error,
+        }, f, indent=2, default=str)
 
 
 if __name__ == "__main__":
