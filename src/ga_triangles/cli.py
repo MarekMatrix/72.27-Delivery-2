@@ -55,9 +55,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="If set, split the target image into --chunk-size x --chunk-size pieces, "
              "run an independent GA on each at full resolution, and recombine into the "
-             "final image. Meant to preserve full resolution without one slow monolithic "
-             "run -- use instead of --max-image-size, not together with it. Triangles "
-             "cannot cross chunk boundaries, so expect visible seams.",
+             "final image. Combine with --max-image-size to chunk a downscaled image "
+             "(resize is applied first). Triangles cannot cross chunk boundaries, so "
+             "expect visible seams.",
     )
     parser.add_argument(
         "--chunk-generations",
