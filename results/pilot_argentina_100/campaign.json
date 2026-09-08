@@ -1,0 +1,243 @@
+{
+  "baseline": "elite_one_point_gene_t50_p30_g300_8e05d8cbd25f",
+  "baseline_config": {
+    "n_triangles": 50,
+    "target_image_path": "/Users/hannahkalager/72.27-Delivery-2/data/flag_100.png",
+    "population_size": 30,
+    "n_generations": 300,
+    "min_error": null,
+    "selection_method": "elite",
+    "tournament_size": 3,
+    "tournament_probability": 0.75,
+    "boltzmann_temperature": 1.0,
+    "crossover_method": "one_point",
+    "crossover_rate": 0.9,
+    "mutation_method": "gene",
+    "mutation_rate": 0.05,
+    "survival_strategy": "additive",
+    "random_seed": null,
+    "extra": {}
+  },
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "target_sha256": "5c2538884c74f4f778ac5512d14bdca99ec5bbf069be0369838ebc99eda84a1b",
+  "experiments": {
+    "selection": [
+      {
+        "selection": "elite",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "roulette",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "universal",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "boltzmann",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "tournament_deterministic",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "tournament_probabilistic",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "ranking",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      }
+    ],
+    "crossover": [
+      {
+        "selection": "elite",
+        "crossover": "two_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "elite",
+        "crossover": "uniform",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      }
+    ],
+    "triangles": [
+      {
+        "selection": "elite",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 20,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "elite",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 100,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      }
+    ],
+    "population": [
+      {
+        "selection": "elite",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 50,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "elite",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 100,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "elite",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 200,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      }
+    ],
+    "survival": [
+      {
+        "selection": "elite",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "elite",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "exclusive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      }
+    ],
+    "mutation": [
+      {
+        "selection": "elite",
+        "crossover": "one_point",
+        "mutation": "gene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "elite",
+        "crossover": "one_point",
+        "mutation": "multigene",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "elite",
+        "crossover": "one_point",
+        "mutation": "uniform",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      },
+      {
+        "selection": "elite",
+        "crossover": "one_point",
+        "mutation": "complete",
+        "triangles": 50,
+        "survival": "additive",
+        "population_size": 30,
+        "mutation_rate": 0.05,
+        "crossover_rate": 0.9
+      }
+    ]
+  }
+}
