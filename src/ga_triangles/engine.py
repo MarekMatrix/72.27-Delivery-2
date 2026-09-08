@@ -7,15 +7,17 @@ Owner: whoever picks up "engine & survival".
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable
 import random
 
 import numpy as np
 
 from ga_triangles.fitness import fitness
+from ga_triangles.image_io import recombine_chunks, split_into_chunks
 from ga_triangles.individual import Individual
 from ga_triangles.metrics import History
+from ga_triangles.render import render
 
 from ga_triangles.selection import (
     select_elite,
@@ -59,6 +61,12 @@ class GAResult:
     history: History
     n_generations_run: int
     stop_reason: str
+
+
+@dataclass
+class ChunkedGAResult:
+    final_image: np.ndarray
+    chunk_results: list[tuple[GAResult, tuple[int, int]]]  # (result, (row_offset, col_offset))
 
 
 def should_stop(generation: int, config: GAConfig, history: History) -> str | None:
@@ -312,3 +320,56 @@ def run_ga(
         n_generations_run=generation,
         stop_reason=stop_reason,
     )
+
+
+def run_ga_chunked(
+    target: np.ndarray,
+    config: GAConfig,
+    chunk_size: int,
+    chunk_generations: int,
+    on_chunk_generation: Callable[[int, int, int, int, float], None] | None = None,
+) -> ChunkedGAResult:
+    """Split `target` into chunk_size x chunk_size pieces, run an independent
+    GA on each at full resolution, and recombine into one image.
+
+    Each chunk gets its own independent population and run_ga() call, using
+    `config` with n_generations overridden to `chunk_generations` -- the
+    point is that each chunk is a much smaller subproblem than the whole
+    image, so it can converge in far fewer generations than a single
+    monolithic run would need to reach the same resolution.
+
+    on_chunk_generation, if given, is called as
+    on_chunk_generation(chunk_index, n_chunks, generation, n_generations, best_fitness)
+    for every generation of every chunk (chunk_index is 0-based).
+
+    Triangles cannot cross chunk boundaries, since each chunk's GA only ever
+    sees its own pixels -- expect visible seams at chunk edges.
+    """
+    chunks = split_into_chunks(target, chunk_size)
+    n_chunks = len(chunks)
+    chunk_config = replace(config, n_generations=chunk_generations)
+
+    rendered_chunks: list[tuple[np.ndarray, tuple[int, int]]] = []
+    chunk_results: list[tuple[GAResult, tuple[int, int]]] = []
+
+    for chunk_index, (chunk_target, offset) in enumerate(chunks):
+        def wrapped_on_generation(
+            generation: int,
+            n_generations: int,
+            best_fitness: float,
+            chunk_index: int = chunk_index,
+        ) -> None:
+            if on_chunk_generation is not None:
+                on_chunk_generation(chunk_index, n_chunks, generation, n_generations, best_fitness)
+
+        result = run_ga(chunk_target, chunk_config, on_generation=wrapped_on_generation)
+
+        height, width = chunk_target.shape[:2]
+        rendered = render(result.best_individual, width, height)
+
+        rendered_chunks.append((rendered, offset))
+        chunk_results.append((result, offset))
+
+    final_image = recombine_chunks(rendered_chunks, target.shape[:2])
+
+    return ChunkedGAResult(final_image=final_image, chunk_results=chunk_results)

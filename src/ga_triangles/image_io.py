@@ -53,3 +53,49 @@ def blank_canvas(width: int = 720, height: int = 720, background: tuple[int, int
     # TODO: allocate a (height, width, 3) uint8 array filled with `background`.
     """
     raise NotImplementedError
+
+
+def split_into_chunks(
+    image: np.ndarray, chunk_size: int
+) -> list[tuple[np.ndarray, tuple[int, int]]]:
+    """Split `image` into a grid of chunks at most chunk_size x chunk_size.
+
+    Returns (chunk_array, (row_offset, col_offset)) pairs, offset being the
+    chunk's top-left position in `image`, in pixels. Edge chunks along the
+    bottom/right may be smaller than chunk_size if the image doesn't divide
+    evenly.
+    """
+    height, width = image.shape[:2]
+    chunks: list[tuple[np.ndarray, tuple[int, int]]] = []
+
+    for row_offset in range(0, height, chunk_size):
+        for col_offset in range(0, width, chunk_size):
+            chunk = image[
+                row_offset : row_offset + chunk_size,
+                col_offset : col_offset + chunk_size,
+            ]
+            chunks.append((chunk, (row_offset, col_offset)))
+
+    return chunks
+
+
+def recombine_chunks(
+    chunks: list[tuple[np.ndarray, tuple[int, int]]],
+    full_shape: tuple[int, int],
+) -> np.ndarray:
+    """Paste rendered chunk images back into their original positions.
+
+    Args:
+        chunks: (chunk_image, (row_offset, col_offset)) pairs -- same offsets
+            split_into_chunks produced, but each chunk_image is now that
+            chunk's rendered GA approximation, not the original pixels.
+        full_shape: (height, width) of the un-chunked target image.
+    """
+    height, width = full_shape
+    canvas = np.zeros((height, width, 3), dtype=np.uint8)
+
+    for chunk_image, (row_offset, col_offset) in chunks:
+        h, w = chunk_image.shape[:2]
+        canvas[row_offset : row_offset + h, col_offset : col_offset + w] = chunk_image
+
+    return canvas

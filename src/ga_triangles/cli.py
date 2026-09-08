@@ -19,7 +19,7 @@ from ga_triangles.config import (
     SelectionMethod,
     SurvivalStrategy,
 )
-from ga_triangles.engine import run_ga
+from ga_triangles.engine import run_ga, run_ga_chunked
 from ga_triangles.image_io import load_target_image, save_image
 from ga_triangles.render import render
 
@@ -48,6 +48,25 @@ def build_arg_parser() -> argparse.ArgumentParser:
              "other two vertices offset by at most this much (in [0,1] canvas units), "
              "biasing the initial population toward smaller triangles. Default: fully "
              "independent random vertices (can be large).",
+    )
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=None,
+        help="If set, split the target image into --chunk-size x --chunk-size pieces, "
+             "run an independent GA on each at full resolution, and recombine into the "
+             "final image. Meant to preserve full resolution without one slow monolithic "
+             "run -- use instead of --max-image-size, not together with it. Triangles "
+             "cannot cross chunk boundaries, so expect visible seams.",
+    )
+    parser.add_argument(
+        "--chunk-generations",
+        type=int,
+        default=None,
+        help="Generations to run per chunk when --chunk-size is set (each chunk is a much "
+             "smaller subproblem than the full image, so it can converge in far fewer "
+             "generations). Defaults to --generations if not given. Ignored without "
+             "--chunk-size.",
     )
 
     parser.add_argument("--population-size", type=int, default=100)
@@ -90,6 +109,77 @@ def make_progress_printer(n_generations: int) -> Callable[[int, int, float], Non
         sys.stdout.flush()
 
     return printer
+
+
+def make_chunk_progress_printer(n_chunks: int) -> Callable[[int, int, int, int, float], None]:
+    """Return a callback suitable for run_ga_chunked's on_chunk_generation.
+
+    Prints '\r' progress within a chunk's run, and a trailing newline once
+    that chunk finishes so each chunk leaves one final line behind.
+    """
+
+    def printer(
+        chunk_index: int,
+        n_chunks_: int,
+        generation: int,
+        n_generations: int,
+        best_fitness: float,
+    ) -> None:
+        denom = max(n_generations, 1)
+        pct = min(generation / denom, 1.0) * 100
+        end = "\n" if generation >= n_generations else ""
+        sys.stdout.write(
+            f"\rChunk {chunk_index + 1}/{n_chunks_} | "
+            f"Gen {generation}/{n_generations} ({pct:5.1f}%) best_fitness={best_fitness:.4f}{end}"
+        )
+        sys.stdout.flush()
+
+    return printer
+
+
+def write_chunked_run_summary(
+    path: Path,
+    config: GAConfig,
+    image_path: str,
+    chunk_size: int,
+    chunk_generations: int,
+    chunked_result,
+) -> None:
+    """Write a short Markdown summary of a chunked run's settings and outcome."""
+    fitnesses = [result.best_individual.fitness for result, _ in chunked_result.chunk_results]
+
+    lines = [
+        f"# Chunked run: {path.parent.name}",
+        "",
+        "## Settings",
+        "",
+        "| Parameter | Value |",
+        "|---|---|",
+        f"| image | `{image_path}` |",
+        f"| chunk_size | {chunk_size} |",
+        f"| chunk_generations | {chunk_generations} |",
+        f"| triangles per chunk | {config.n_triangles} |",
+        f"| initial_triangle_max_offset | {config.initial_triangle_max_offset} |",
+        f"| population_size | {config.population_size} |",
+        f"| selection | {config.selection_method.value} |",
+        f"| crossover | {config.crossover_method.value} |",
+        f"| crossover_rate | {config.crossover_rate} |",
+        f"| mutation | {config.mutation_method.value} |",
+        f"| mutation_rate | {config.mutation_rate} |",
+        f"| survival | {config.survival_strategy.value} |",
+        f"| seed | {config.random_seed} |",
+        "",
+        "## Result",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
+        f"| chunks | {len(chunked_result.chunk_results)} |",
+        f"| mean best fitness | {sum(fitnesses) / len(fitnesses):.6f} |",
+        f"| min best fitness | {min(fitnesses):.6f} |",
+        f"| max best fitness | {max(fitnesses):.6f} |",
+        "",
+    ]
+    path.write_text("\n".join(lines))
 
 
 def write_run_summary(path: Path, config: GAConfig, image_path: str, result_summary: dict) -> None:
@@ -149,28 +239,52 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     target = load_target_image(image_path, max_size=args.max_image_size)
-    result = run_ga(target, config, on_generation=make_progress_printer(config.n_generations))
-    print()
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    save_image(render(result.best_individual, target.shape[1], target.shape[0]), str(output_dir / "approximation.png"))
-    result.history.plot(str(output_dir / "fitness.png"))
+    if args.chunk_size is not None:
+        chunk_generations = args.chunk_generations if args.chunk_generations is not None else args.generations
+        n_chunks = len(range(0, target.shape[0], args.chunk_size)) * len(range(0, target.shape[1], args.chunk_size))
 
-    with open(output_dir / "triangles.json", "w") as f:
-        json.dump({"config": config.__dict__, "stop_reason": result.stop_reason}, f, indent=2, default=str)
+        chunked_result = run_ga_chunked(
+            target,
+            config,
+            chunk_size=args.chunk_size,
+            chunk_generations=chunk_generations,
+            on_chunk_generation=make_chunk_progress_printer(n_chunks),
+        )
 
-    write_run_summary(
-        output_dir / "run_summary.md",
-        config,
-        image_path,
-        {
-            "n_generations_run": result.n_generations_run,
-            "stop_reason": result.stop_reason,
-            "best_fitness": result.best_individual.fitness,
-        },
-    )
+        save_image(chunked_result.final_image, str(output_dir / "approximation.png"))
+
+        write_chunked_run_summary(
+            output_dir / "run_summary.md",
+            config,
+            image_path,
+            args.chunk_size,
+            chunk_generations,
+            chunked_result,
+        )
+    else:
+        result = run_ga(target, config, on_generation=make_progress_printer(config.n_generations))
+        print()
+
+        save_image(render(result.best_individual, target.shape[1], target.shape[0]), str(output_dir / "approximation.png"))
+        result.history.plot(str(output_dir / "fitness.png"))
+
+        with open(output_dir / "triangles.json", "w") as f:
+            json.dump({"config": config.__dict__, "stop_reason": result.stop_reason}, f, indent=2, default=str)
+
+        write_run_summary(
+            output_dir / "run_summary.md",
+            config,
+            image_path,
+            {
+                "n_generations_run": result.n_generations_run,
+                "stop_reason": result.stop_reason,
+                "best_fitness": result.best_individual.fitness,
+            },
+        )
 
 
 if __name__ == "__main__":
