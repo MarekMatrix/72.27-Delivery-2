@@ -11,6 +11,8 @@ import pytest
 from experiments import experiments as runner
 from experiments.analysis import build_analysis, load_runs, summarize
 from ga_triangles import cli
+from ga_triangles.individual import Individual, Triangle
+from ga_triangles.render import render
 
 
 def target_image(tmp_path):
@@ -46,7 +48,41 @@ def test_dry_run_writes_nothing_and_deduplicates_baseline(tmp_path, monkeypatch,
     runner.main(["--image", str(image), "--results-dir", str(output), "--dry-run",
                  "--experiment", "all", "--population-size", "100", "--seeds", "42", "123"])
     assert not output.exists()
-    assert "10 configurations × 2 seeds = 20 runs" in capsys.readouterr().out
+    assert "17 configurations × 2 seeds = 34 runs" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("factor,methods", [
+    ("selection", {"elite", "roulette", "universal", "boltzmann", "ranking",
+                   "tournament_deterministic", "tournament_probabilistic"}),
+    ("mutation", {"gene", "multigene", "uniform", "complete"}),
+])
+def test_all_methods_run_with_identical_other_settings(tmp_path, monkeypatch, factor, methods):
+    calls = []
+    monkeypatch.setattr(runner, "run_single", lambda cfg, seed, **kw: calls.append((cfg, seed)))
+    image = target_image(tmp_path)
+    runner.main(["--image", str(image), "--results-dir", str(tmp_path / "campaign"),
+                 "--experiment", factor, "--population-size", "100", "--seeds", "42", "123"])
+    assert len(calls) == len(methods) * 2
+    assert {(cfg[factor], seed) for cfg, seed in calls} == {
+        (method, seed) for method in methods for seed in (42, 123)}
+    baseline = {**runner.BASELINE, "population_size": 100}
+    for cfg, _ in calls:
+        assert {**cfg, factor: baseline[factor]} == baseline
+
+
+def test_survival_changes_only_strategy_and_reuses_baseline(tmp_path, monkeypatch):
+    baseline = {**runner.BASELINE, "population_size": 100}
+    plan = runner.experiment_plan(baseline)["survival"]
+    assert {cfg["survival"] for cfg in plan} == {"additive", "exclusive"}
+    for cfg in plan:
+        assert {**cfg, "survival": baseline["survival"]} == baseline
+    calls = []
+    monkeypatch.setattr(runner, "run_single", lambda cfg, seed, **kw: calls.append((cfg, seed)))
+    image = target_image(tmp_path)
+    runner.main(["--image", str(image), "--results-dir", str(tmp_path / "campaign"),
+                 "--experiment", "survival", "--population-size", "100", "--seeds", "42", "123"])
+    assert [(cfg["survival"], seed) for cfg, seed in calls] == [
+        ("additive", 42), ("additive", 123), ("exclusive", 42), ("exclusive", 123)]
 
 
 def test_campaign_rejects_changed_budget(tmp_path, monkeypatch):
@@ -69,7 +105,7 @@ def test_cli_times_only_ga(tmp_path, monkeypatch):
         return np.zeros((8, 8, 3), dtype=np.uint8)
     def ga(target, config):
         clock[0] += 3
-        return SimpleNamespace(best_individual=SimpleNamespace(fitness=0.8),
+        return SimpleNamespace(best_individual=SimpleNamespace(fitness=0.8, triangles=[]),
                                history=SimpleNamespace(best_error=[0.25], best_fitness=[0.8],
                                                        plot=lambda path: None),
                                n_generations_run=0, stop_reason="maximum generations reached")
@@ -83,14 +119,28 @@ def test_cli_times_only_ga(tmp_path, monkeypatch):
     assert json.loads((tmp_path / "triangles.json").read_text())["ga_elapsed_s"] == 3
 
 
-def test_real_run_resume_analysis_and_stale_config(tmp_path, monkeypatch):
+@pytest.mark.parametrize("survival", ["additive", "exclusive"])
+def test_real_run_resume_analysis_and_stale_config(tmp_path, monkeypatch, survival):
     image = target_image(tmp_path)
     output = tmp_path / "campaign"
-    cfg = {**runner.BASELINE, "triangles": 2, "population_size": 2}
+    cfg = {**runner.BASELINE, "triangles": 2, "population_size": 2, "survival": survival}
     data = runner.run_single(cfg, 42, results_dir=output, image=str(image), generations=1)
     assert 0 < data["ga_elapsed_s"] < data["elapsed"]
     assert data["config"]["population_size"] == 2
     result_path = next(output.glob("*/seed_*/triangles.json"))
+    # Exported geometry alone must reproduce the returned image, without the target.
+    restored = Individual([
+        Triangle(tuple(tuple(point) for point in triangle["vertices"]), tuple(triangle["color"]))
+        for triangle in data["triangles"]
+    ])
+    canvas = data["canvas"]
+    assert len(restored.triangles) == cfg["triangles"]
+    reconstructed = render(restored, canvas["width"], canvas["height"], tuple(canvas["background_rgb"]))
+    with Image.open(result_path.parent / "approximation.png") as saved_image:
+        np.testing.assert_array_equal(reconstructed, np.asarray(saved_image))
+    missing_geometry = {k: v for k, v in data.items() if k != "triangles"}
+    with pytest.raises(ValueError, match="triangles"):
+        runner.validate_result(missing_geometry, data["config"], result_path)
     original = result_path.read_bytes()
     monkeypatch.setattr(runner.subprocess, "run", lambda *a, **kw: pytest.fail("Cached GA restarted"))
     assert runner.run_single(cfg, 42, results_dir=output, image=str(image), generations=1) == data

@@ -15,6 +15,7 @@ import sys
 import time
 
 from ga_triangles.cli import build_arg_parser, config_from_args
+from ga_triangles.config import MutationMethod, SelectionMethod
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE = "data/skrik.png"
@@ -32,10 +33,12 @@ BASELINE = {
 def experiment_plan(baseline: dict, population_sizes=(50, 100, 200)) -> dict:
     return {
         "selection": [{**baseline, "selection": value}
-                      for value in ("tournament_deterministic", "roulette", "ranking")],
+                      for value in (method.value for method in SelectionMethod)],
         "crossover": [{**baseline, "crossover": value} for value in ("two_point", "uniform")],
         "triangles": [{**baseline, "triangles": value} for value in (20, 100)],
         "population": [{**baseline, "population_size": value} for value in population_sizes],
+        "survival": [{**baseline, "survival": value} for value in ("additive", "exclusive")],
+        "mutation": [{**baseline, "mutation": method.value} for method in MutationMethod],
     }
 
 
@@ -90,6 +93,22 @@ def validate_result(data: dict, expected: dict, path: Path) -> None:
             raise ValueError("missing or invalid GA timing")
         if not data["stop_reason"]:
             raise ValueError("missing stop reason")
+        triangles = data["triangles"]
+        if not isinstance(triangles, list) or len(triangles) != expected["n_triangles"]:
+            raise ValueError("missing or incorrect triangle count")
+        for triangle in triangles:
+            vertices, color = triangle["vertices"], triangle["color"]
+            if len(vertices) != 3 or any(len(point) != 2 for point in vertices) or len(color) != 4:
+                raise ValueError("triangles require three (x, y) vertices and RGBA colour")
+            if not all(isinstance(v, (int, float)) and math.isfinite(v) and 0 <= v <= 1
+                       for v in [*(v for point in vertices for v in point), *color]):
+                raise ValueError("triangle coordinates and colours must be numbers in [0, 1]")
+        canvas = data["canvas"]
+        if any(type(canvas[k]) is not int or canvas[k] <= 0 for k in ("width", "height")):
+            raise ValueError("invalid canvas dimensions")
+        background = canvas["background_rgb"]
+        if len(background) != 3 or any(type(v) is not int or not 0 <= v <= 255 for v in background):
+            raise ValueError("invalid canvas background")
     except (KeyError, TypeError, ValueError, IndexError) as exc:
         raise ValueError(f"Incomplete/invalid result {path}: {exc}. Use a new campaign directory.") from exc
     for name in ("approximation.png", "fitness.png"):
@@ -199,9 +218,16 @@ def main(argv: list[str] | None = None) -> None:
             return
         results_dir.mkdir(parents=True, exist_ok=True)
         write_json(manifest_path, manifest)
+        total = len(unique) * len(args.seeds)
+        completed = 0
+        print(f"Fremdrift: {completed}/{total} fullført | {total} gjenstår", flush=True)
         for cfg in unique.values():
             for seed in args.seeds:
                 run_single(cfg, seed, results_dir=results_dir, image=str(image), generations=args.generations)
+                # Count new runs and successfully validated cached results only.
+                completed += 1
+                print(f"Fremdrift: {completed}/{total} fullført | {total - completed} gjenstår",
+                      flush=True)
         write_summary(results_dir)
         print(f"Done. Analyse with: uv run python experiments/analysis.py --results-dir '{results_dir}'")
     except (ValueError, OSError, subprocess.CalledProcessError) as exc:

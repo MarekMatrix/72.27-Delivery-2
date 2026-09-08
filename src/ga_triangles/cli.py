@@ -79,6 +79,14 @@ def main(argv: list[str] | None = None) -> None:
     with open(output_dir / "triangles.json", "w") as f:
         json.dump({
             "config": config.__dict__,
+            "canvas": {"width": target.shape[1], "height": target.shape[0],
+                       "background_rgb": [255, 255, 255]},
+            # Preserve drawing order; later triangles are painted on top.
+            "triangles": [
+                {"vertices": [[float(x), float(y)] for x, y in triangle.vertices],
+                 "color": [float(channel) for channel in triangle.color]}
+                for triangle in result.best_individual.triangles
+            ],
             "ga_elapsed_s": ga_elapsed_s,
             "stop_reason": result.stop_reason,
             "n_generations_run": result.n_generations_run,

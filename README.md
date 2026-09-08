@@ -28,7 +28,11 @@ uv run ga-triangles --image data/flag.png --triangles 100 --generations 500 \
 
 Run `uv run ga-triangles --help` for every flag (population size, rates, seed, etc).
 Outputs land in `results/`: the approximated image, a fitness-over-generations
-plot, and a JSON dump of the run config + stop reason.
+plot, and `triangles.json` containing the run configuration, metrics, canvas
+dimensions/background, and the returned individual's triangles in drawing order.
+Each triangle has three normalized `(x, y)` vertices and a normalized RGBA `color`
+(all values in `[0, 1]`). Later triangles are drawn over earlier ones. The canvas
+background uses RGB integers in `[0, 255]`.
 
 ## Pipeline
 

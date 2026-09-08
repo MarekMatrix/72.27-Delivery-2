@@ -34,6 +34,28 @@ def test_missing_runtime_and_single_run_are_not_zero():
     assert row["iqr_mse"] is None
 
 
+def test_survival_plot_preserves_losses_and_excludes_other_changes(tmp_path, monkeypatch):
+    from experiments import analysis
+    baseline = make_run(history=(0.8, 0.4, 0.3))
+    exclusive = make_run(history=(0.8, 0.3, 0.5), survival_strategy="exclusive")
+    groups = group_runs([baseline, exclusive,
+                        make_run(survival_strategy="exclusive", population_size=100)],
+                       baseline.config, "survival_strategy")
+    assert groups == {"additive": [baseline], "exclusive": [exclusive]}
+    def inspect_figure(fig, *args, **kwargs):
+        ax = fig.axes[0]
+        np.testing.assert_allclose(ax.lines[1].get_ydata(), [0.8, 0.3, 0.5])
+        assert "Current-generation" in ax.get_ylabel()
+        assert kwargs["title"].startswith("4.6 Survival")
+        analysis.plt.close(fig)
+        return "checked"
+    monkeypatch.setattr(analysis, "save_figure", inspect_figure)
+    analysis.plot_convergence(groups, tmp_path, "survival", "survival")
+    _, bands = convergence_summary([exclusive])
+    np.testing.assert_allclose(bands[1], [0.8, 0.3, 0.3])
+    assert summarize([exclusive])["median_mse"] == 0.5
+
+
 def test_statistics_and_threshold_failures():
     row = summarize([make_run(history=(0.8, 0.2), elapsed=2),
                      make_run(seed=123, history=(0.8, 0.6), elapsed=4)], threshold=0.3)
@@ -81,3 +103,25 @@ def test_bad_history_is_reported(tmp_path):
     runs, warnings = load_runs(tmp_path)
     assert not runs
     assert "history must include generation 0" in warnings[0]
+
+
+def test_mutation_report_exports_all_methods_and_excludes_changed_rates(tmp_path):
+    import csv
+    from experiments.analysis import build_analysis
+    for method in ("gene", "multigene", "uniform", "complete"):
+        save_run(tmp_path / method / "seed_42", make_run(mutation_method=method, mutation_rate=0.05))
+    save_run(tmp_path / "different_rate" / "seed_42",
+             make_run(mutation_method="uniform", mutation_rate=0.2))
+    report = build_analysis(tmp_path, baseline_name="gene", expected_runs=1)
+    content = report.read_text()
+    assert "## 4.7 Mutation methods" in content
+    assert "## 4.8 Overall comparison" in content
+    assert "Excluded" in content and "different_rate" in content
+    assert "same numerical mutation rate does not imply" in content
+    for name in ("4_7_mutation_convergence", "4_7_mutation_final_mse"):
+        assert (report.parent / f"{name}.png").exists()
+    with (report.parent / "configuration_summary.csv").open() as stream:
+        rows = [row for row in csv.DictReader(stream) if row["experiment"] == "mutation"]
+    assert {row["configuration"] for row in rows} == {"gene", "multigene", "uniform", "complete"}
+    with (report.parent / "overall_summary.csv").open() as stream:
+        assert len(list(csv.DictReader(stream))) == 4

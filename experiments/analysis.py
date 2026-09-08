@@ -1,4 +1,4 @@
-"""Report figures/statistics for 4.1–4.6; never launches the GA.
+"""Report figures/statistics for 4.1–4.8; never launches the GA.
 
 Run: uv run python experiments/analysis.py
 The notebook imports these same functions. Saved configs define comparisons.
@@ -10,10 +10,12 @@ import csv
 from dataclasses import dataclass
 import json
 from pathlib import Path
+import textwrap
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 import numpy as np
 from PIL import Image
 
@@ -24,6 +26,8 @@ GROUPS = {
     "crossover": ("4.3 Crossover methods", "crossover_method"),
     "triangles": ("4.4 Number of triangles", "n_triangles"),
     "population": ("4.5 Population size", "population_size"),
+    "survival": ("4.6 Survival strategies", "survival_strategy"),
+    "mutation": ("4.7 Mutation methods", "mutation_method"),
 }
 
 
@@ -113,14 +117,15 @@ def group_runs(runs: list[Run], baseline: dict, field: str) -> dict:
     return dict(sorted(grouped.items()))
 
 
-def convergence_summary(runs: list[Run]) -> tuple[np.ndarray, np.ndarray]:
-    """Median/IQR best-so-far MSE; truncate at the shortest observed history.
+def convergence_summary(runs: list[Run], *, best_so_far: bool = True) -> tuple[np.ndarray, np.ndarray]:
+    """Median/IQR MSE; truncate at the shortest observed history.
 
     No extrapolation after early stopping or changing sample size along a curve.
-    Final population MSE is kept separate: exclusive survival can lose a best.
+    Use best_so_far=False to show current-generation best, including losses.
     """
     length = min(len(run.history) for run in runs)
-    histories = np.array([np.minimum.accumulate(r.history)[:length] for r in runs])
+    histories = np.array([(np.minimum.accumulate(r.history) if best_so_far else r.history)[:length]
+                          for r in runs])
     return np.arange(length), np.quantile(histories, [0.25, 0.5, 0.75], axis=0)
 
 
@@ -150,70 +155,204 @@ def summarize(runs: list[Run], threshold: float | None = None) -> dict:
     return row
 
 
-def save_figure(fig, output: Path, name: str) -> str:
-    fig.tight_layout()
+def display_label(value) -> str:
+    names = {
+        "elite": "Elite", "roulette": "Roulette", "ranking": "Ranking",
+        "tournament_deterministic": "Deterministic tournament",
+        "tournament_probabilistic": "Probabilistic tournament",
+        "one_point": "One-point", "two_point": "Two-point", "uniform": "Uniform",
+    }
+    return names.get(value, str(value).replace("_", " ").capitalize())
+
+
+def plot_context(config: dict, experiment: str | None = None) -> str:
+    parts = [f"Target: {Path(config['target_image_path']).name}",
+             f"Budget: {config['n_generations']} generations"]
+    if experiment != "triangles":
+        parts.append(f"{config['n_triangles']} triangles")
+    if experiment != "population":
+        parts.append(f"Population: {config['population_size']}")
+    if experiment != "selection":
+        parts.append(f"Selection: {display_label(config['selection_method'])}")
+    if experiment != "crossover":
+        parts.append(f"Crossover: {display_label(config['crossover_method'])}")
+    if experiment == "mutation":
+        parts.append(f"Mutation rate: {config['mutation_rate']:g}")
+        parts.append(f"Survival: {display_label(config['survival_strategy'])}")
+    return " | ".join(parts)
+
+
+def save_figure(fig, output: Path, name: str, *, title: str,
+                question: str, context: str, guide: str) -> str:
+    """Give every standalone figure its experiment, question and reading guide."""
+    fig.text(0.07, 0.97, title, fontsize=16, weight="bold", va="top")
+    fig.text(0.07, 0.92, question, fontsize=12, va="top")
+    fig.text(0.07, 0.87, textwrap.fill(context, 115), fontsize=9, color="#555555", va="top")
+    fig.text(0.07, 0.025, textwrap.fill(guide, 125), fontsize=10, color="#333333", va="bottom")
+    fig.tight_layout(rect=(0.02, 0.13, 0.99, 0.80))
     for extension in ("png", "pdf"):
         fig.savefig(output / f"{name}.{extension}", dpi=180, bbox_inches="tight")
     plt.close(fig)
-    return f"![{name.replace('_', ' ')}]({name}.png)"
+    return f"![{title}]({name}.png)\n\n{guide}"
 
 
-def plot_convergence(groups: dict, output: Path, name: str) -> str:
-    fig, ax = plt.subplots(figsize=(9, 5))
+def style_axis(ax):
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.grid(axis="y", alpha=0.2)
+    ax.set_axisbelow(True)
+
+
+def plot_convergence(groups: dict, output: Path, name: str, experiment: str) -> str:
+    fig, ax = plt.subplots(figsize=(10, 7))
+    best_so_far = experiment != "survival"
     end = min(len(r.history) for runs in groups.values() for r in runs)
     for label, runs in groups.items():
-        x, (q1, median, q3) = convergence_summary(runs)
-        line, = ax.plot(x[:end], median[:end], label=f"{label} (n={len(runs)})")
-        ax.fill_between(x[:end], q1[:end], q3[:end], color=line.get_color(), alpha=0.18)
+        x, (q1, median, q3) = convergence_summary(runs, best_so_far=best_so_far)
+        line, = ax.plot(x[:end], median[:end], linewidth=2,
+                       label=f"{display_label(label)} (n={len(runs)})")
+        ax.fill_between(x[:end], q1[:end], q3[:end], color=line.get_color(), alpha=0.15)
     ax.set(xlabel="Generation (0 = initial population)",
-           ylabel="Best-so-far normalized MSE ↓", title="Convergence: median and IQR across seeds")
-    ax.legend()
-    ax.grid(alpha=0.2)
-    return save_figure(fig, output, name)
+           ylabel="Best-so-far MSE (lower is better)" if best_so_far else
+                  "Current-generation best MSE (lower is better)")
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.legend(frameon=False, fontsize=10, ncol=2 if len(groups) > 4 else 1)
+    style_axis(ax)
+    question = {
+        "selection": "Which selection method reduces image error fastest?",
+        "crossover": "Which crossover method reduces image error fastest?",
+        "mutation": "Which mutation method reduces image error fastest?",
+        "population": "How does population size affect progress per generation?",
+        "survival": "How does allowing parents to survive affect solution quality over generations?",
+    }[experiment]
+    return save_figure(fig, output, name,
+                       title=f"{GROUPS[experiment][0]} — convergence", question=question,
+                       context=plot_context(next(iter(groups.values()))[0].config, experiment),
+                       guide="Each colour is one configuration. Line = median across seeds; shading = middle 50% (IQR), "
+                             "not a confidence interval. Lower curves mean better solutions at that generation. "
+                             "n = number of runs; generation speed is not wall-clock speed. "
+                             + ("" if best_so_far else "Current-generation best, not best-so-far: increases reveal "
+                                "lost quality; the median can hide losses in individual runs."))
 
 
-def plot_distribution(groups: dict, output: Path, name: str, runtime=False) -> str:
-    fig, ax = plt.subplots(figsize=(9, 5))
+def plot_distribution(groups: dict, output: Path, name: str, experiment: str, runtime=False) -> str:
+    fig, ax = plt.subplots(figsize=(max(10, 1.9 * len(groups)), 7))
     for index, (label, runs) in enumerate(groups.items(), 1):
         values = [r.ga_elapsed_s if runtime else r.error for r in runs]
         values = [v for v in values if v is not None]
+        color = plt.get_cmap("tab10")((index - 1) % 10)
         if values:
-            ax.boxplot([values], positions=[index], widths=0.45, showfliers=False)
-            ax.scatter(index + np.linspace(-0.08, 0.08, len(values)), values,
-                       s=24, alpha=0.7, zorder=3)
+            if len(values) > 1:
+                ax.boxplot([values], positions=[index], widths=0.45, showfliers=False,
+                           patch_artist=True, boxprops={"facecolor": color, "alpha": 0.2},
+                           medianprops={"color": color, "linewidth": 2})
+            offsets = np.linspace(-0.08, 0.08, len(values)) if len(values) > 1 else [0]
+            ax.scatter(index + np.asarray(offsets), values, color=color, s=35, zorder=3)
         else:
             ax.text(index, 0.5, "No GA timing", transform=ax.get_xaxis_transform(), ha="center")
-    labels = [f"{label}\n(n={sum(r.ga_elapsed_s is not None for r in runs) if runtime else len(runs)})"
+    labels = [f"{textwrap.fill(display_label(label), 20)}\n"
+              f"n={sum(r.ga_elapsed_s is not None for r in runs) if runtime else len(runs)}"
               for label, runs in groups.items()]
-    ax.set_xticks(range(1, len(groups) + 1), labels, rotation=15)
+    ax.set_xticks(range(1, len(groups) + 1), labels)
     ax.set_xlim(0.5, len(groups) + 0.5)
-    ax.set(ylabel="GA runtime (s) ↓" if runtime else "Final normalized MSE ↓",
-           title="GA runtime across seeds" if runtime else "Final solution quality and stability")
-    ax.grid(axis="y", alpha=0.2)
-    return save_figure(fig, output, name)
+    ax.set(xlabel={"selection": "Selection method", "crossover": "Crossover method",
+                   "triangles": "Number of triangles", "population": "Population size",
+                   "survival": "Survival strategy", "mutation": "Mutation method"}[experiment],
+           ylabel="GA runtime (seconds; lower is faster)" if runtime else "Final MSE (lower is better)")
+    style_axis(ax)
+    question = ({"triangles": "How much computation does increasing the triangle count cost?",
+                 "population": "How much computation does increasing the population cost?"}[experiment]
+                if runtime else {
+                    "selection": "Which selection method gives low and consistent final error?",
+                    "crossover": "Which crossover method gives low and consistent final error?",
+                    "mutation": "Which mutation method gives low and consistent final error?",
+                    "triangles": "Does increasing the triangle count improve final image quality?",
+                    "population": "Does increasing population size improve final image quality?",
+                    "survival": "Which survival strategy gives low and consistent final error?",
+                }[experiment])
+    return save_figure(fig, output, name,
+                       title=f"{GROUPS[experiment][0]} — {'computational cost' if runtime else 'quality and stability'}",
+                       question=question, context=plot_context(next(iter(groups.values()))[0].config, experiment),
+                       guide="Each dot is one run (seed). Box = middle 50%; line inside = median. "
+                             "Whiskers extend to observations within 1.5 × IQR; all runs are shown as dots. "
+                             + ("Compare typical runtime and its spread." if runtime else
+                                "Lower boxes indicate better quality; shorter boxes indicate less variation."))
 
 
-def plot_images(groups: dict, baseline: dict, output: Path) -> str:
-    """Choose the run nearest median final MSE; break ties by seed."""
-    fig, axes = plt.subplots(1, len(groups) + 1, figsize=(3 * (len(groups) + 1), 4))
-    target = Path(baseline["target_image_path"])
-    if not target.is_absolute():
-        target = ROOT / target
-    panels = [(target, "Target (current file)")]
-    for label, runs in groups.items():
-        median = np.median([r.error for r in runs])
-        representative = min(runs, key=lambda r: (abs(r.error - median), str(r.seed)))
-        panels.append((representative.path.parent / "approximation.png",
-                       f"{label} triangles · seed {representative.seed}\nMSE {representative.error:.5f}"))
-    for ax, (path, title) in zip(axes, panels):
+def target_path(baseline: dict) -> Path:
+    path = Path(baseline["target_image_path"])
+    return path if path.is_absolute() else ROOT / path
+
+
+def plot_image_panels(panels: list, baseline: dict, output: Path, name: str,
+                      title: str, question: str, guide: str, experiment=None) -> str:
+    columns = min(4, len(panels))
+    rows = (len(panels) + columns - 1) // columns
+    fig, axes = plt.subplots(rows, columns, squeeze=False, figsize=(12, 3 * rows + 3))
+    for ax in axes.flat:
+        ax.axis("off")
+    for ax, (path, label) in zip(axes.flat, panels):
         if path.exists():
             with Image.open(path) as img:
                 ax.imshow(img.convert("RGB"))
         else:
             ax.text(0.5, 0.5, "Image unavailable", ha="center", va="center")
-        ax.set_title(title, fontsize=10)
-        ax.axis("off")
-    return save_figure(fig, output, "triangles_images")
+        ax.set_title(label, fontsize=11, pad=10)
+    return save_figure(fig, output, name, title=title, question=question,
+                       context=plot_context(baseline, experiment), guide=guide)
+
+
+def plot_images(groups: dict, baseline: dict, output: Path) -> str:
+    """Choose the run nearest median final MSE; break ties by seed."""
+    panels = [(target_path(baseline), "Target (current file)")]
+    for label, runs in groups.items():
+        median = np.median([r.error for r in runs])
+        representative = min(runs, key=lambda r: (abs(r.error - median), str(r.seed)))
+        panels.append((representative.path.parent / "approximation.png",
+                       f"{label} triangles · seed {representative.seed}\nMSE {representative.error:.5f}"))
+    return plot_image_panels(panels, baseline, output, "4_4_triangles_images",
+                             "4.4 Number of triangles — visual quality",
+                             "What visual detail is gained by using more triangles?",
+                             "Each configuration shows the run closest to its median final MSE. "
+                             "Compare shapes, colours and detail with the target; MSE alone does not measure recognizability.",
+                             experiment="triangles")
+
+
+def baseline_overview(runs: list[Run], output: Path) -> list[str]:
+    """Explain repetitions of the baseline separately from parameter experiments."""
+    runs = sorted(runs, key=lambda run: run.seed)
+    baseline = runs[0].config
+    fig, ax = plt.subplots(figsize=(10, 7))
+    for run in runs:
+        ax.plot(np.minimum.accumulate(run.history), label=f"Seed {run.seed}", linewidth=1.8)
+    ax.set(xlabel="Generation (0 = initial population)", ylabel="Best-so-far MSE (lower is better)")
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.legend(frameon=False, ncol=2 if len(runs) > 5 else 1)
+    style_axis(ax)
+    curve = save_figure(fig, output, "4_1_baseline_seed_convergence",
+                        title="4.1 Baseline check — progress across seeds",
+                        question="Does the baseline keep improving within the generation budget?",
+                        context=plot_context(baseline),
+                        guide="Each line is a different seed using the SAME configuration, not a different method. "
+                              "A falling line means improvement; a flat line means no new best solution. "
+                              "Separated lines show variation between runs.")
+    panels = [(target_path(baseline), "Target (current file)")]
+    panels.extend((run.path.parent / "approximation.png", f"Seed {run.seed}\nFinal MSE {run.error:.5f}")
+                  for run in runs)
+    images = plot_image_panels(panels, baseline, output, "4_1_baseline_seed_images",
+                               "4.1 Baseline check — generated images",
+                               "How recognizable is the target after the same generation budget?",
+                               "All available baseline seeds are shown. They use the same settings; "
+                               "differences arise from the random run. Compare the visible shapes and colours as well as MSE.")
+    rows = [{"seed": run.seed, "initial_mse": float(run.history[0]), "final_mse": run.error,
+             "ga_time": run.ga_elapsed_s, "generation_best": run.generation_best} for run in runs]
+    table = markdown_table(rows, {"seed": "Seed", "initial_mse": "Initial MSE",
+                                 "final_mse": "Final MSE ↓", "ga_time": "GA time (s)",
+                                 "generation_best": "First gen. of best"})
+    return ["### Baseline check: understand the repeated runs first",
+            "The baseline figures compare seeds of one configuration. They do not compare selection methods, "
+            "crossovers, mutations, survival strategies, triangle counts or populations. "
+            "Those comparisons appear below only when alternatives have been run.",
+            curve, table, images]
 
 
 def format_value(value) -> str:
@@ -254,6 +393,17 @@ DISCUSSION = {
                  "The displayed run is closest to median final MSE, not chosen as the best-looking image.",
     "population": "Compare quality gains with runtime and convergence. Equal generations are not an equal "
                   "computational budget when population size changes; larger populations process more candidates.",
+    "survival": "Compare additive (parents and offspring compete) with exclusive (only offspring survive). "
+                "Does retaining parents improve final quality and consistency? Compare median GA time too. "
+                "These curves show current-generation best MSE: exclusive may lose an earlier best solution. "
+                "The median can hide individual losses; inspect per-seed histories and best_observed_mse in runs.csv. "
+                "These measurements do not establish population diversity.",
+    "mutation": "Compare convergence, final quality, seed variation and GA runtime with all other settings fixed. "
+                "The same numerical mutation rate does not imply the same amount of mutation: gene can change "
+                "one triangle per individual; multigene tests a random subset; uniform tests every triangle; "
+                "complete perturbs every triangle when triggered for an individual. Each selected triangle has "
+                "one coordinate or colour component changed. Relate results to these differences without "
+                "claiming that diversity was measured directly.",
 }
 
 
@@ -294,7 +444,8 @@ def build_analysis(results_dir: Path = ROOT / "results", output_dir: Path | None
     baseline_seeds = {r.seed for r in baseline_runs}
     for name, group in groups.items():
         runner_field = {"selection": "selection", "crossover": "crossover",
-                        "triangles": "triangles", "population": "population_size"}[name]
+                        "triangles": "triangles", "population": "population_size", "survival": "survival",
+                        "mutation": "mutation"}[name]
         planned = {cfg[runner_field] for cfg in planned_experiments.get(name, []) if runner_field in cfg}
         if planned - set(group):
             warnings.append(f"{name}: missing planned values {sorted(planned - set(group))}.")
@@ -317,7 +468,8 @@ def build_analysis(results_dir: Path = ROOT / "results", output_dir: Path | None
         warnings.append("The saved generation budget is at most 5: treat these as smoke-test data.")
     if any(r.error > np.min(r.history) + 1e-12 for r in runs if r.path in included):
         warnings.append("Some runs lost earlier best solutions: final MSE describes the returned final "
-                        "population, while convergence shows best-so-far MSE.")
+                        "population. Survival curves show current-generation best MSE; other convergence "
+                        "comparisons show best-so-far MSE.")
 
     lines = ["# 4. Experiments & Results", "Generated descriptive results and discussion prompts. "
              "Complete the interpretation after the full experiment campaign.",
@@ -326,6 +478,10 @@ def build_analysis(results_dir: Path = ROOT / "results", output_dir: Path | None
              "and **stability** (variation across independent seeds).",
              f"Baseline directory: `{baseline_name}`. Planned runs/configuration: **{expected_runs}**. "
              f"Observed baseline seeds: `{sorted(baseline_seeds)}`.",
+             "The main experiment budget means the resources chosen for the final comparisons: "
+             "a fixed generation limit per run and a planned number of seeds per configuration. "
+             "Population size is fixed except in its own experiment. This is not a runtime limit "
+             "and does not guarantee that the GA has converged.",
              "Saved baseline configuration (the random seed varies):",
              "```json\n" + json.dumps({k: v for k, v in baseline.items() if k != "random_seed"}, indent=2) + "\n```",
              "MSE is averaged over RGB channels after dividing pixel values by 255, so it lies in [0, 1]. "
@@ -333,6 +489,7 @@ def build_analysis(results_dir: Path = ROOT / "results", output_dir: Path | None
              "Each comparison changes one saved setting relative to the same baseline. Baseline runs are reused "
              "across sections and counted once in the overall comparison.",
              "Curves show median best-so-far MSE with IQR (25th–75th percentile), not a confidence interval. "
+             "Exception: survival curves show current-generation best MSE so losses remain visible. "
              "Generation 0 is initialization. SD uses n−1; SD and IQR are omitted for a single run.",
              "GA time (`ga_elapsed_s`) measures only `run_ga`, including initialization and fitness evaluation. "
              "Total time (`elapsed`) includes subprocess startup, image loading, GA, plotting and file output. "
@@ -347,24 +504,30 @@ def build_analysis(results_dir: Path = ROOT / "results", output_dir: Path | None
         lines.append(f"Common target: normalized MSE ≤ {threshold:g}. Threshold tables report successes/all "
                      "runs and median first-hit generation among successes only. Failures are not zero-generation "
                      "hits. Choose the target before comparing outcomes.")
+    lines.extend(baseline_overview(baseline_runs, output))
     rows = []
     for name, (heading, field) in GROUPS.items():
         group = groups[name]
         lines.append(f"## {heading}")
-        if len(group) < 2:
-            lines.append("**Incomplete comparison: only baseline data are available.**")
-        if name in ("selection", "crossover"):
-            lines.append(plot_convergence(group, output, f"{name}_convergence"))
-        lines.append(plot_distribution(group, output, f"{name}_mse"))
-        if name in ("triangles", "population"):
-            lines.append(plot_distribution(group, output, f"{name}_runtime", runtime=True))
-        if name == "triangles":
-            lines.append(plot_images(group, baseline, output))
-        if name == "population":
-            lines.append(plot_convergence(group, output, f"{name}_convergence"))
         section_rows = [{"experiment": name, "configuration": label, **summarize(members, threshold)}
                         for label, members in group.items()]
         rows.extend(section_rows)
+        if len(group) < 2:
+            lines.append("**Not yet available: only the baseline has been run for this factor.** "
+                         "See the baseline figures in 4.1. A comparison figure will appear here once at least "
+                         "two values of this factor are available.")
+            lines.append("**Question for this experiment:** " + DISCUSSION[name])
+            continue
+        prefix = heading.split()[0].replace(".", "_") + "_" + name
+        if name in ("selection", "crossover", "survival", "mutation"):
+            lines.append(plot_convergence(group, output, f"{prefix}_convergence", name))
+        lines.append(plot_distribution(group, output, f"{prefix}_final_mse", name))
+        if name in ("triangles", "population"):
+            lines.append(plot_distribution(group, output, f"{prefix}_ga_runtime", name, runtime=True))
+        if name == "triangles":
+            lines.append(plot_images(group, baseline, output))
+        if name == "population":
+            lines.append(plot_convergence(group, output, f"{prefix}_convergence", name))
         lines.append(markdown_table(section_rows, TABLE_COLUMNS))
         if threshold is not None:
             lines.append(markdown_table(section_rows, {"configuration": "Configuration", "runs": "n",
@@ -372,13 +535,16 @@ def build_analysis(results_dir: Path = ROOT / "results", output_dir: Path | None
         lines.extend(["**Analysis prompts:** " + DISCUSSION[name],
                       "Write your interpretation here, citing measured differences and uncertainty."])
 
-    lines.append("## 4.6 Overall comparison")
+    lines.append("## 4.8 Overall comparison")
     overall = [{"configuration": members[0].path.parent.parent.name, **summarize(members, threshold)}
                for members in unique_groups.values()]
     lines.append(markdown_table(overall, TABLE_COLUMNS))
     for label, metric in [("Quality: lowest median final MSE", "median_mse"),
                           ("Speed: lowest median GA runtime", "median_ga_runtime_s"),
                           ("Stability: lowest final-MSE IQR", "iqr_mse")]:
+        if len(overall) < 2:
+            lines.append(f"- {label}: no comparison yet; only baseline results are available.")
+            continue
         eligible = [row for row in overall if row[metric] is not None and
                     (metric != "median_ga_runtime_s" or row["ga_runtime_runs"] == row["runs"])]
         if eligible:
