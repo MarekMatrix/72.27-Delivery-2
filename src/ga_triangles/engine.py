@@ -1,9 +1,4 @@
-"""Main GA loop: orchestrates selection, crossover, mutation and survival.
-
-Owner: whoever picks up "engine & survival".
-"""
-
-
+"""Main GA loop: orchestrates selection, crossover, mutation and survival."""
 
 from __future__ import annotations
 
@@ -30,6 +25,7 @@ from ga_triangles.selection import (
 )
 
 from ga_triangles.config import (
+    CrossoverMethod,
     GAConfig,
     MutationMethod,
     SelectionMethod,
@@ -53,7 +49,7 @@ from ga_triangles.crossover import (
     crossover_two_point,
     crossover_uniform,
 )
-from ga_triangles.config import CrossoverMethod  
+
 
 @dataclass
 class GAResult:
@@ -161,15 +157,14 @@ def apply_mutation(
 
     if config.mutation_method == MutationMethod.COMPLETE:
         return mutate_complete(
-            individual, 
-            config.mutation_rate, 
+            individual,
+            config.mutation_rate,
             rng,
         )
 
     raise ValueError(
         f"Unknown mutation method: {config.mutation_method}"
     )
-
 
 
 def apply_survival(
@@ -212,9 +207,8 @@ def record_population_metrics(
         np.mean([individual.fitness for individual in population])
     )
 
-    # fitness() caches score = 1 / (1 + k*error) with k=1 (the default used
-    # everywhere in this file), so error is recovered exactly without
-    # re-rendering and re-diffing the best individual a second time.
+    # fitness = 1 / (1 + error), so recover error by inverting instead of
+    # re-rendering the best individual.
     best_error = 1.0 / best_individual.fitness - 1.0
 
     history.record(
@@ -330,20 +324,9 @@ def run_ga_chunked(
     on_chunk_generation: Callable[[int, int, int, int, float], None] | None = None,
 ) -> ChunkedGAResult:
     """Split `target` into chunk_size x chunk_size pieces, run an independent
-    GA on each at full resolution, and recombine into one image.
-
-    Each chunk gets its own independent population and run_ga() call, using
-    `config` with n_generations overridden to `chunk_generations` -- the
-    point is that each chunk is a much smaller subproblem than the whole
-    image, so it can converge in far fewer generations than a single
-    monolithic run would need to reach the same resolution.
-
-    on_chunk_generation, if given, is called as
-    on_chunk_generation(chunk_index, n_chunks, generation, n_generations, best_fitness)
-    for every generation of every chunk (chunk_index is 0-based).
-
-    Triangles cannot cross chunk boundaries, since each chunk's GA only ever
-    sees its own pixels -- expect visible seams at chunk edges.
+    GA on each (with n_generations = chunk_generations) and recombine the
+    rendered chunks into one image. Triangles can't cross chunk boundaries,
+    so expect visible seams at the edges.
     """
     chunks = split_into_chunks(target, chunk_size)
     n_chunks = len(chunks)

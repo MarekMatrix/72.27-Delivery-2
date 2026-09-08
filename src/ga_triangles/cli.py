@@ -1,8 +1,4 @@
-"""Command-line entry point: `ga-triangles --image ... --triangles ...`.
-
-Argument parsing is boilerplate and implemented in full here. It calls
-straight into engine.run_ga.
-"""
+"""Command-line entry point: `ga-triangles --image ... --triangles ...`."""
 
 from __future__ import annotations
 
@@ -19,7 +15,7 @@ from ga_triangles.config import (
     SelectionMethod,
     SurvivalStrategy,
 )
-from ga_triangles.engine import run_ga, run_ga_chunked
+from ga_triangles.engine import GAResult, run_ga, run_ga_chunked
 from ga_triangles.image_io import load_target_image, save_image
 from ga_triangles.render import render
 
@@ -37,36 +33,27 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--max-image-size",
         type=int,
         default=None,
-        help="Downscale the target image so its longer side is at most this many pixels "
-             "(aspect ratio preserved, never upscales). Speeds up rendering/fitness a lot.",
+        help="Downscale the target so its longer side is at most this many pixels.",
     )
     parser.add_argument(
         "--triangle-max-offset",
         type=float,
         default=None,
-        help="If set, initial triangles are built from one random anchor point plus the "
-             "other two vertices offset by at most this much (in [0,1] canvas units), "
-             "biasing the initial population toward smaller triangles. Default: fully "
-             "independent random vertices (can be large).",
+        help="Keep initial triangles small: the other two vertices stay within this "
+             "offset (in [0,1]) of the first. Default: fully random vertices.",
     )
     parser.add_argument(
         "--chunk-size",
         type=int,
         default=None,
-        help="If set, split the target image into --chunk-size x --chunk-size pieces, "
-             "run an independent GA on each at full resolution, and recombine into the "
-             "final image. Combine with --max-image-size to chunk a downscaled image "
-             "(resize is applied first). Triangles cannot cross chunk boundaries, so "
-             "expect visible seams.",
+        help="Split the target into chunk-size x chunk-size tiles and evolve each "
+             "one separately, then stitch them back together (seams are expected).",
     )
     parser.add_argument(
         "--chunk-generations",
         type=int,
         default=None,
-        help="Generations to run per chunk when --chunk-size is set (each chunk is a much "
-             "smaller subproblem than the full image, so it can converge in far fewer "
-             "generations). Defaults to --generations if not given. Ignored without "
-             "--chunk-size.",
+        help="Generations per chunk when --chunk-size is set. Defaults to --generations.",
     )
 
     parser.add_argument("--population-size", type=int, default=100)
@@ -98,7 +85,7 @@ def default_image_path(data_dir: str | Path = "data") -> Path:
 
 
 def make_progress_printer(n_generations: int) -> Callable[[int, int, float], None]:
-    """Return a callback suitable for run_ga's on_generation, printing '\r' progress."""
+    """on_generation callback that overwrites a single line with gen/pct/fitness."""
 
     def printer(generation: int, total_generations: int, best_fitness: float) -> None:
         denom = max(total_generations, 1)
@@ -112,11 +99,8 @@ def make_progress_printer(n_generations: int) -> Callable[[int, int, float], Non
 
 
 def make_chunk_progress_printer(n_chunks: int) -> Callable[[int, int, int, int, float], None]:
-    """Return a callback suitable for run_ga_chunked's on_chunk_generation.
-
-    Prints '\r' progress within a chunk's run, and a trailing newline once
-    that chunk finishes so each chunk leaves one final line behind.
-    """
+    """on_chunk_generation callback: one live line per chunk, closed with a
+    newline when the chunk's last generation lands."""
 
     def printer(
         chunk_index: int,
@@ -137,6 +121,55 @@ def make_chunk_progress_printer(n_chunks: int) -> Callable[[int, int, int, int, 
     return printer
 
 
+def _write_summary(
+    path: Path,
+    title: str,
+    settings: list[tuple[str, object]],
+    results: list[tuple[str, object]],
+) -> None:
+    """Write a run_summary.md with a settings table and a results table."""
+
+    def table(rows: list[tuple[str, object]], key_header: str) -> str:
+        header = [f"| {key_header} | Value |", "|---|---|"]
+        return "\n".join(header + [f"| {key} | {value} |" for key, value in rows])
+
+    path.write_text(
+        f"# {title}\n\n"
+        f"## Settings\n\n{table(settings, 'Parameter')}\n\n"
+        f"## Result\n\n{table(results, 'Metric')}\n"
+    )
+
+
+def _common_settings(config: GAConfig, image_path: str) -> list[tuple[str, object]]:
+    return [
+        ("image", f"`{image_path}`"),
+        ("initial_triangle_max_offset", config.initial_triangle_max_offset),
+        ("population_size", config.population_size),
+        ("selection", config.selection_method.value),
+        ("crossover", config.crossover_method.value),
+        ("crossover_rate", config.crossover_rate),
+        ("mutation", config.mutation_method.value),
+        ("mutation_rate", config.mutation_rate),
+        ("survival", config.survival_strategy.value),
+        ("seed", config.random_seed),
+    ]
+
+
+def write_run_summary(path: Path, config: GAConfig, image_path: str, result: GAResult) -> None:
+    settings = [
+        ("triangles", config.n_triangles),
+        ("generations (max)", config.n_generations),
+        ("min_error", config.min_error),
+        *_common_settings(config, image_path),
+    ]
+    results = [
+        ("generations run", result.n_generations_run),
+        ("stop reason", result.stop_reason),
+        ("best fitness", f"{result.best_individual.fitness:.6f}"),
+    ]
+    _write_summary(path, f"Run: {path.parent.name}", settings, results)
+
+
 def write_chunked_run_summary(
     path: Path,
     config: GAConfig,
@@ -145,76 +178,20 @@ def write_chunked_run_summary(
     chunk_generations: int,
     chunked_result,
 ) -> None:
-    """Write a short Markdown summary of a chunked run's settings and outcome."""
     fitnesses = [result.best_individual.fitness for result, _ in chunked_result.chunk_results]
-
-    lines = [
-        f"# Chunked run: {path.parent.name}",
-        "",
-        "## Settings",
-        "",
-        "| Parameter | Value |",
-        "|---|---|",
-        f"| image | `{image_path}` |",
-        f"| chunk_size | {chunk_size} |",
-        f"| chunk_generations | {chunk_generations} |",
-        f"| triangles per chunk | {config.n_triangles} |",
-        f"| initial_triangle_max_offset | {config.initial_triangle_max_offset} |",
-        f"| population_size | {config.population_size} |",
-        f"| selection | {config.selection_method.value} |",
-        f"| crossover | {config.crossover_method.value} |",
-        f"| crossover_rate | {config.crossover_rate} |",
-        f"| mutation | {config.mutation_method.value} |",
-        f"| mutation_rate | {config.mutation_rate} |",
-        f"| survival | {config.survival_strategy.value} |",
-        f"| seed | {config.random_seed} |",
-        "",
-        "## Result",
-        "",
-        "| Metric | Value |",
-        "|---|---|",
-        f"| chunks | {len(chunked_result.chunk_results)} |",
-        f"| mean best fitness | {sum(fitnesses) / len(fitnesses):.6f} |",
-        f"| min best fitness | {min(fitnesses):.6f} |",
-        f"| max best fitness | {max(fitnesses):.6f} |",
-        "",
+    settings = [
+        ("chunk_size", chunk_size),
+        ("chunk_generations", chunk_generations),
+        ("triangles per chunk", config.n_triangles),
+        *_common_settings(config, image_path),
     ]
-    path.write_text("\n".join(lines))
-
-
-def write_run_summary(path: Path, config: GAConfig, image_path: str, result_summary: dict) -> None:
-    """Write a short Markdown summary of the run's settings and outcome."""
-    lines = [
-        f"# Run: {path.parent.name}",
-        "",
-        "## Settings",
-        "",
-        "| Parameter | Value |",
-        "|---|---|",
-        f"| image | `{image_path}` |",
-        f"| triangles | {config.n_triangles} |",
-        f"| initial_triangle_max_offset | {config.initial_triangle_max_offset} |",
-        f"| population_size | {config.population_size} |",
-        f"| generations (max) | {config.n_generations} |",
-        f"| min_error | {config.min_error} |",
-        f"| selection | {config.selection_method.value} |",
-        f"| crossover | {config.crossover_method.value} |",
-        f"| crossover_rate | {config.crossover_rate} |",
-        f"| mutation | {config.mutation_method.value} |",
-        f"| mutation_rate | {config.mutation_rate} |",
-        f"| survival | {config.survival_strategy.value} |",
-        f"| seed | {config.random_seed} |",
-        "",
-        "## Result",
-        "",
-        "| Metric | Value |",
-        "|---|---|",
-        f"| generations run | {result_summary['n_generations_run']} |",
-        f"| stop reason | {result_summary['stop_reason']} |",
-        f"| best fitness | {result_summary['best_fitness']:.6f} |",
-        "",
+    results = [
+        ("chunks", len(chunked_result.chunk_results)),
+        ("mean best fitness", f"{sum(fitnesses) / len(fitnesses):.6f}"),
+        ("min best fitness", f"{min(fitnesses):.6f}"),
+        ("max best fitness", f"{max(fitnesses):.6f}"),
     ]
-    path.write_text("\n".join(lines))
+    _write_summary(path, f"Chunked run: {path.parent.name}", settings, results)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -275,16 +252,7 @@ def main(argv: list[str] | None = None) -> None:
         with open(output_dir / "triangles.json", "w") as f:
             json.dump({"config": config.__dict__, "stop_reason": result.stop_reason}, f, indent=2, default=str)
 
-        write_run_summary(
-            output_dir / "run_summary.md",
-            config,
-            image_path,
-            {
-                "n_generations_run": result.n_generations_run,
-                "stop_reason": result.stop_reason,
-                "best_fitness": result.best_individual.fitness,
-            },
-        )
+        write_run_summary(output_dir / "run_summary.md", config, image_path, result)
 
 
 if __name__ == "__main__":

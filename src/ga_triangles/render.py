@@ -33,9 +33,8 @@ def render(individual: Individual, width: int, height: int,
         min_x, max_x = min(xs), max(xs)
         min_y, max_y = min(ys), max(ys)
 
-        # Only allocate/clear/blit the triangle's own bounding box instead of
-        # the whole canvas -- fill+blit cost scales with surface size, and for
-        # a canvas full of small triangles that dwarfs the actual polygon draw.
+        # Work on the triangle's bounding box, not the whole canvas -- much
+        # cheaper when the triangles are small.
         bbox_width = max_x - min_x + 1
         bbox_height = max_y - min_y + 1
 
